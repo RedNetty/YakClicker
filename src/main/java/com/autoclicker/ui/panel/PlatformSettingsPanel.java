@@ -3,9 +3,11 @@ package com.autoclicker.ui.panel;
 import com.autoclicker.storage.SettingsManager;
 import com.autoclicker.ui.frame.MainFrame;
 import com.autoclicker.util.PlatformDetector;
+import com.autoclicker.util.PlatformUnicodeIcons;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.UnsupportedEncodingException;
 
 /**
  * Settings panel for platform-specific configurations.
@@ -38,11 +40,12 @@ public class PlatformSettingsPanel extends JPanel {
         platformInfoPanel.setLayout(new BorderLayout());
 
         // Platform icon and name
-        String platformIconText = getPlatformIcon();
+        PlatformUnicodeIcons.EmojiRenderInfo renderInfo = getPlatformEmojiRenderInfo();
+        String platformIconText = renderInfo.getEmoji();
         String platformName = PlatformDetector.getOSNameAndVersion();
 
         JLabel platformIconLabel = new JLabel(platformIconText);
-        platformIconLabel.setFont(new Font("Arial", Font.BOLD, 32));
+        platformIconLabel.setFont(renderInfo.getFont());
         platformIconLabel.setHorizontalAlignment(SwingConstants.CENTER);
         platformIconLabel.setForeground(parentFrame.getPrimaryColor());
 
@@ -133,17 +136,14 @@ public class PlatformSettingsPanel extends JPanel {
     }
 
     private String getPlatformIcon() {
-        PlatformDetector.OS os = PlatformDetector.getOperatingSystem();
-        switch (os) {
-            case WINDOWS:
-                return "🪟";
-            case MACOS:
-                return "🍎";
-            case LINUX:
-                return "🐧";
-            default:
-                return "🖥️";
-        }
+            return PlatformUnicodeIcons.getPlatformIcon();
+    }
+    /**
+     * Retrieves platform emoji render information with robust font handling.
+     * @return EmojiRenderInfo with emoji and appropriate font
+     */
+    private PlatformUnicodeIcons.EmojiRenderInfo getPlatformEmojiRenderInfo() {
+        return PlatformUnicodeIcons.getPlatformEmojiRenderInfo();
     }
 
     private String getPlatformDescription() {

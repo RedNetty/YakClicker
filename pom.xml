@@ -96,7 +96,7 @@
           <configuration>
             <archive>
               <manifest>
-                <mainClass>com.autoclicker.Main</mainClass>
+                <mainClass>com.autoclicker.application.YakClickerApp</mainClass>
               </manifest>
             </archive>
             <descriptorRefs>

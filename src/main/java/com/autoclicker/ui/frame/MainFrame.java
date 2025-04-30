@@ -13,6 +13,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.RoundRectangle2D;
+// No longer need java.net.URL, java.awt.image.BufferedImage, java.util.List, java.util.ArrayList
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -24,6 +25,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * Enhanced with modern UI components, performance metrics, and pattern recording.
  *
  * Fixed potential flashing issue with ClickIndicatorPanel by making its parent opaque.
+ * Reverted to using standard text characters (X, -, D/L, *) for title bar controls
+ * for better cross-platform font compatibility.
  */
 public class MainFrame extends JFrame {
     private final SettingsManager settingsManager;
@@ -43,6 +46,9 @@ public class MainFrame extends JFrame {
     private QuickActionBar quickActionBar;
     private StatisticsPanel statisticsPanel;
     private JPanel rightPanel; // Added field reference for theme updates
+    // Removed icon-related fields (appIconLabel, themeButton references are still okay if needed elsewhere, but icons themselves are gone)
+    // private JLabel appIconLabel; // Can remove if only used for icon
+    private JButton themeButton; // Keep reference for updating text
 
     // Timers
     private Timer statusUpdateTimer;
@@ -83,6 +89,8 @@ public class MainFrame extends JFrame {
         // Initialize UIThemeManager with current theme
         UIThemeManager.getInstance().setDarkMode(isDarkMode);
 
+        // --- Icon loading removed ---
+
         // Create keybind manager
         this.keybindManager = new KeybindManager(settingsManager, this, clickerService);
 
@@ -122,7 +130,7 @@ public class MainFrame extends JFrame {
         // Theme applied later in applyTheme()
 
         // Create UI Elements
-        titleBar = createTitleBar();
+        titleBar = createTitleBar(); // Title bar uses text icons again
         statusBar = createStatusBar();
         JPanel resizeHandle = createResizeHandle();
 
@@ -230,6 +238,9 @@ public class MainFrame extends JFrame {
         });
     }
 
+    // --- Icon loading methods removed ---
+    // loadIcons(), loadImageIcon(), createPlaceholderIcon(), showIconLoadWarning()
+
     /**
      * Toggles the application theme between light and dark mode.
      */
@@ -255,6 +266,7 @@ public class MainFrame extends JFrame {
         Color borderCol = themeManager.getColor("border");
         Color titleTextCol = themeManager.getColor("text_primary");
         Color statusTextCol = themeManager.getColor("text_secondary");
+        Color primaryCol = themeManager.getColor("primary"); // For app icon
 
         // Apply to root pane and content pane for overall background
         getRootPane().setBackground(frameBg); // Frame background (visible due to rounded corners)
@@ -264,12 +276,21 @@ public class MainFrame extends JFrame {
         if (titleBar != null) {
             titleBar.setBackground(frameBg);
             titleBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, borderCol));
-            // Update title label color
-            for(Component c : ((JPanel)titleBar.getComponent(0)).getComponents()) { // Assuming titlePanel is first
-                if (c instanceof JLabel) {
-                    ((JLabel) c).setForeground(titleTextCol);
-                    if(((JLabel) c).getText().equals("YakClicker")) { // Only change font for title text
-                        ((JLabel) c).setFont(themeManager.getFont("heading_medium"));
+            // Update title label color and app icon label color
+            Component titlePanelComp = titleBar.getComponent(0); // Assuming titlePanel is first
+            if (titlePanelComp instanceof JPanel) {
+                JPanel titlePanel = (JPanel) titlePanelComp;
+                for(Component c : titlePanel.getComponents()) {
+                    if (c instanceof JLabel) {
+                        JLabel label = (JLabel) c;
+                        // Check if it's the app icon label (based on text maybe?)
+                        if ("*".equals(label.getText())) { // Assuming "*" is the app icon text
+                            label.setForeground(primaryCol); // Use primary color for app icon
+                            label.setFont(new Font("Arial", Font.BOLD, 18)); // Make icon slightly larger/bolder
+                        } else { // It's the title text label
+                            label.setForeground(titleTextCol);
+                            label.setFont(themeManager.getFont("heading_medium"));
+                        }
                     }
                 }
             }
@@ -339,7 +360,7 @@ public class MainFrame extends JFrame {
             tabbedPane.repaint();
         }
 
-        // Update title bar buttons
+        // Update title bar buttons (styling and theme text)
         if (titleBar != null && titleBar.getComponentCount() > 1) {
             updateTitleBarButtons();
         }
@@ -354,7 +375,7 @@ public class MainFrame extends JFrame {
     }
 
     /**
-     * Updates the title bar buttons with current theme.
+     * Updates the title bar buttons with current theme styling and correct theme text.
      */
     private void updateTitleBarButtons() {
         Component buttonPanelComp = titleBar.getComponent(1); // Assuming button panel is second
@@ -363,19 +384,19 @@ public class MainFrame extends JFrame {
             for (Component c : buttonPanel.getComponents()) {
                 if (c instanceof JButton) {
                     JButton button = (JButton) c;
+                    String actionCommand = button.getActionCommand(); // Use action command
 
-                    // Apply theme-appropriate styling
-                    if (button.getText().equals("✕")) {
-                        // Special styling for close button
-                        styleWindowControlButton(button, "close");
-                    } else if (button.getText().equals("—")) {
-                        // Minimize button
+                    if ("toggle_theme".equals(actionCommand)) {
+                        // Update theme text based on current theme
+                        button.setText(isDarkMode ? "L" : "D"); // L for Light, D for Dark
+                        button.setToolTipText(isDarkMode ? "Switch to Light Theme" : "Switch to Dark Theme");
+                        styleWindowControlButton(button, "theme"); // Re-apply base styling
+                    } else if ("minimize".equals(actionCommand)) {
+                        button.setText("-"); // Ensure text is set
                         styleWindowControlButton(button, "minimize");
-                    } else if (button.getText().equals("🌙") || button.getText().equals("☀️")) {
-                        // Theme toggle button
-                        styleWindowControlButton(button, "theme");
-                        // Update icon based on current theme
-                        button.setText(isDarkMode ? "☀️" : "🌙");
+                    } else if ("close".equals(actionCommand)) {
+                        button.setText("X"); // Ensure text is set
+                        styleWindowControlButton(button, "close");
                     }
                 }
             }
@@ -383,27 +404,27 @@ public class MainFrame extends JFrame {
     }
 
     /**
-     * Applies styling to window control buttons.
+     * Applies styling to window control buttons (using text).
      */
     private void styleWindowControlButton(JButton button, String type) {
         UIThemeManager themeManager = UIThemeManager.getInstance();
 
         // Remove existing mouse listeners to prevent duplicates
         for (MouseListener ml : button.getMouseListeners()) {
-            // Check if the listener is one of ours (typically anonymous or inner class)
             if (ml.getClass().isAnonymousClass() || ml.getClass().getEnclosingClass() == MainFrame.class) {
                 button.removeMouseListener(ml);
             }
         }
 
-        // Base styling
-        button.setForeground(themeManager.getColor("text_secondary"));
-        button.setFont(themeManager.getFont("body_medium"));
+        // Base styling for text buttons
+        button.setForeground(themeManager.getColor("text_secondary")); // Default text color
+        button.setFont(new Font("Arial", Font.BOLD, 14)); // Use a common font, bold
         button.setBackground(null); // Start transparent
-        button.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
+        button.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12)); // Adjust padding for text
         button.setFocusPainted(false);
         button.setContentAreaFilled(false);
         button.setOpaque(false); // Button itself is not opaque
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
         // Button-specific styling and effects
         Color hoverBg;
@@ -416,8 +437,10 @@ public class MainFrame extends JFrame {
         } else {
             // Other buttons have subtle hover effect
             hoverBg = themeManager.isDarkMode() ?
-                    themeManager.getColor("border") : // Use border color for subtle dark hover
-                    UIThemeManager.darken(themeManager.getColor("surface"), 0.05f); // Slightly darken surface for light hover
+                    themeManager.getColor("border") :
+                    UIThemeManager.darken(themeManager.getColor("surface"), 0.05f);
+            // Keep original foreground color on hover for minimize/theme
+            hoverFg = themeManager.getColor("text_secondary");
         }
 
         // Use final variables for listener
@@ -430,14 +453,14 @@ public class MainFrame extends JFrame {
             @Override
             public void mouseEntered(MouseEvent e) {
                 button.setBackground(finalHoverBg);
-                button.setForeground(finalHoverFg);
-                button.setContentAreaFilled(true); // Make background visible on hover
+                button.setForeground(finalHoverFg); // Set foreground on hover
+                button.setContentAreaFilled(true);
                 button.setOpaque(true);
             }
 
             @Override
             public void mouseExited(MouseEvent e) {
-                button.setContentAreaFilled(false); // Hide background when not hovered
+                button.setContentAreaFilled(false);
                 button.setOpaque(false);
                 button.setForeground(originalFg); // Reset foreground color
             }
@@ -457,29 +480,32 @@ public class MainFrame extends JFrame {
         JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
         titlePanel.setOpaque(false); // Title panel transparent
 
-        // Simple icon (replace with Image Icon if desired)
-        JLabel iconLabel = new JLabel("⚡"); // Example icon
-        iconLabel.setFont(new Font("Arial", Font.BOLD, 16)); // Adjust font as needed
-        iconLabel.setForeground(themeManager.getColor("primary")); // Use primary theme color
+        // --- Use text character for the app icon ---
+        JLabel appIconLabel = new JLabel("*"); // Simple asterisk as icon
+        // Styling (color, font) applied in applyTheme()
+        appIconLabel.setBorder(BorderFactory.createEmptyBorder(8, 0, 8, 0));
 
         JLabel titleLabel = new JLabel("YakClicker", JLabel.LEFT);
         // Font and color set in applyTheme()
         titleLabel.setBorder(BorderFactory.createEmptyBorder(8, 5, 8, 10)); // Padding
 
-        titlePanel.add(iconLabel);
+        titlePanel.add(appIconLabel); // Add the text icon label
         titlePanel.add(titleLabel);
 
         // Control buttons section (East)
         JPanel controlButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         controlButtons.setOpaque(false); // Buttons panel transparent
 
-        JButton themeButton = createControlButton(isDarkMode ? "☀️" : "🌙", "Toggle Theme");
+        // --- Create buttons using text ---
+        themeButton = createControlButton(isDarkMode ? "L" : "D", // L for Light, D for Dark
+                isDarkMode ? "Switch to Light Theme" : "Switch to Dark Theme",
+                "toggle_theme");
         themeButton.addActionListener(e -> toggleTheme());
 
-        JButton minimizeButton = createControlButton("—", "Minimize");
+        JButton minimizeButton = createControlButton("-", "Minimize", "minimize");
         minimizeButton.addActionListener(e -> setState(Frame.ICONIFIED));
 
-        JButton closeButton = createControlButton("✕", "Close");
+        JButton closeButton = createControlButton("X", "Close", "close"); // Use capital X
         closeButton.addActionListener(e -> {
             // Settings saving handled by shutdown hook or exit action in Main
             System.exit(0);
@@ -495,13 +521,27 @@ public class MainFrame extends JFrame {
         return titleBarPanel;
     }
 
-    private JButton createControlButton(String text, String tooltip) {
+    /**
+     * Creates a control button with text.
+     * @param text The text to display on the button.
+     * @param tooltip The tooltip text.
+     * @param actionCommand A string identifier for the button's action.
+     * @return The configured JButton.
+     */
+    private JButton createControlButton(String text, String tooltip, String actionCommand) {
         JButton button = new JButton(text);
         button.setToolTipText(tooltip);
-        // Initial styling applied here, refined in applyTheme
-        styleWindowControlButton(button, text.equals("✕") ? "close" : (text.equals("—") ? "minimize" : "theme"));
+        button.setActionCommand(actionCommand); // Set action command for identification
+
+        // Initial styling applied here, refined in applyTheme/updateTitleBarButtons
+        // Determine initial type based on action command for styling
+        String type = "theme"; // Default
+        if ("minimize".equals(actionCommand)) type = "minimize";
+        else if ("close".equals(actionCommand)) type = "close";
+        styleWindowControlButton(button, type);
         return button;
     }
+
 
     private JPanel createStatusBar() {
         UIThemeManager themeManager = UIThemeManager.getInstance();
@@ -661,7 +701,7 @@ public class MainFrame extends JFrame {
 
         if (clickerService.isRunning()) {
             if (clickerService.isPaused()) {
-                statusText = "● Paused";
+                statusText = "● Paused"; // Unicode circle still okay here
                 statusColor = warningColor;
             } else {
                 statusText = "● Running";
@@ -966,6 +1006,11 @@ public class MainFrame extends JFrame {
      * Call this after changing hotkey settings.
      */
     public void refreshKeybinds() {
+        // Implementation likely involves calling methods on keybindManager
+        if (keybindManager != null) {
+            // Example: keybindManager.reregisterKeybinds();
+            System.out.println("Keybind refresh requested (implementation needed in refreshKeybinds method).");
+        }
     }
 
     // --- Color and Theme Getters ---
