@@ -3,49 +3,54 @@ package com.autoclicker.ui.theme;
 import javax.swing.*;
 import javax.swing.border.Border;
 import java.awt.*;
+import java.awt.event.MouseAdapter; // Import MouseAdapter
+import java.awt.event.MouseEvent;   // Import MouseEvent
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects; // For null checks
 
 /**
- * Central theme management for the application.
- * Provides consistent styling across all components and screens.
+ * Central theme management for the YakClicker application.
+ * Provides consistent styling (colors, fonts, borders) across UI components.
+ * Supports light and dark modes.
  */
 public class UIThemeManager {
-    // Singleton instance
+    // --- Singleton Instance ---
     private static UIThemeManager instance;
 
-    // Theme colors
+    // --- Theme Storage ---
     private final Map<String, Color> colors = new HashMap<>();
-
-    // Font definitions
     private final Map<String, Font> fonts = new HashMap<>();
-
-    // Border definitions
     private final Map<String, Border> borders = new HashMap<>();
 
-    // Current theme mode
-    private boolean isDarkMode = true;
+    // --- Current State ---
+    private boolean isDarkMode = true; // Default to dark mode
 
-    // Spacing constants
+    // --- Public Constants ---
+
+    // Spacing (used for padding and margins)
     public static final int SPACING_SMALL = 4;
     public static final int SPACING_MEDIUM = 8;
     public static final int SPACING_LARGE = 16;
     public static final int SPACING_XLARGE = 24;
 
-    // Radius constants
+    // Corner Radii (used for rounded components)
     public static final int CORNER_RADIUS_SMALL = 4;
     public static final int CORNER_RADIUS_MEDIUM = 8;
     public static final int CORNER_RADIUS_LARGE = 12;
 
     /**
-     * Private constructor to prevent direct instantiation.
+     * Private constructor for Singleton pattern.
      */
     private UIThemeManager() {
         initializeTheme();
     }
 
     /**
-     * Gets the singleton instance.
+     * Gets the singleton instance of the UIThemeManager.
+     * Ensures thread-safe initialization.
+     *
+     * @return The singleton UIThemeManager instance.
      */
     public static synchronized UIThemeManager getInstance() {
         if (instance == null) {
@@ -55,349 +60,504 @@ public class UIThemeManager {
     }
 
     /**
-     * Initializes the theme with default values.
+     * Initializes theme resources (colors, fonts, borders).
      */
     private void initializeTheme() {
-        // ---------- COLORS ----------
-
-        // Primary colors
-        colors.put("primary", new Color(79, 70, 229));    // Indigo
-        colors.put("primary_light", new Color(99, 102, 241)); // Lighter indigo
-        colors.put("primary_dark", new Color(67, 56, 202)); // Darker indigo
-
-        // Secondary colors
-        colors.put("secondary", new Color(139, 92, 246)); // Purple
-
-        // Accent colors
-        colors.put("success", new Color(34, 197, 94));    // Green
-        colors.put("danger", new Color(239, 68, 68));     // Red
-        colors.put("warning", new Color(234, 179, 8));    // Yellow
-        colors.put("info", new Color(14, 165, 233));      // Sky blue
-
-        // UI backgrounds - Light Mode
-        colors.put("background_light", new Color(249, 250, 251)); // Very light gray
-        colors.put("surface_light", Color.WHITE);         // Pure white
-        colors.put("card_light", Color.WHITE);            // Card background
-        colors.put("border_light", new Color(226, 232, 240)); // Light border
-
-        // UI backgrounds - Dark Mode
-        colors.put("background_dark", new Color(17, 24, 39)); // Very dark blue/gray
-        colors.put("surface_dark", new Color(31, 41, 55));  // Dark slate gray
-        colors.put("card_dark", new Color(31, 41, 55));     // Card background
-        colors.put("border_dark", new Color(55, 65, 81));   // Dark border
-
-        // Text colors - Light Mode
-        colors.put("text_primary_light", new Color(17, 24, 39)); // Near black
-        colors.put("text_secondary_light", new Color(107, 114, 128)); // Medium gray
-        colors.put("text_disabled_light", new Color(156, 163, 175)); // Light gray
-
-        // Text colors - Dark Mode
-        colors.put("text_primary_dark", new Color(249, 250, 251)); // Off white
-        colors.put("text_secondary_dark", new Color(156, 163, 175)); // Light gray
-        colors.put("text_disabled_dark", new Color(107, 114, 128)); // Darker gray
-
-        // Input field colors
-        colors.put("input_background_light", Color.WHITE);
-        colors.put("input_background_dark", new Color(55, 65, 81));
-
-        // ---------- FONTS ----------
-
-        // Base font family
-        String fontFamily = "Segoe UI"; // Modern UI font for Windows
-
-        // Fall back to system fonts if Segoe UI is not available
-        if (!isFontAvailable(fontFamily)) {
-            fontFamily = getSystemFontFamily();
-        }
-
-        // Heading fonts
-        fonts.put("heading_large", new Font(fontFamily, Font.BOLD, 20));
-        fonts.put("heading_medium", new Font(fontFamily, Font.BOLD, 16));
-        fonts.put("heading_small", new Font(fontFamily, Font.BOLD, 14));
-
-        // Body text fonts
-        fonts.put("body_regular", new Font(fontFamily, Font.PLAIN, 13));
-        fonts.put("body_bold", new Font(fontFamily, Font.BOLD, 13));
-        fonts.put("body_medium", new Font(fontFamily, Font.PLAIN, 16));
-
-        // Small text fonts
-        fonts.put("small_regular", new Font(fontFamily, Font.PLAIN, 11));
-        fonts.put("small_bold", new Font(fontFamily, Font.BOLD, 11));
-
-        // UI elements
-        fonts.put("button", new Font(fontFamily, Font.BOLD, 13));
-        fonts.put("label", new Font(fontFamily, Font.PLAIN, 13));
-        fonts.put("tab", new Font(fontFamily, Font.PLAIN, 13));
-
-        // ---------- BORDERS ----------
-
-        // Card borders
-        borders.put("card_light", BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(getColor("border_light"), 1),
-                BorderFactory.createEmptyBorder(SPACING_MEDIUM, SPACING_LARGE, SPACING_MEDIUM, SPACING_LARGE)
-        ));
-
-        borders.put("card_dark", BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(getColor("border_dark"), 1),
-                BorderFactory.createEmptyBorder(SPACING_MEDIUM, SPACING_LARGE, SPACING_MEDIUM, SPACING_LARGE)
-        ));
-
-        // Input field borders
-        borders.put("input_light", BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(getColor("border_light"), 1),
-                BorderFactory.createEmptyBorder(SPACING_SMALL, SPACING_MEDIUM, SPACING_SMALL, SPACING_MEDIUM)
-        ));
-
-        borders.put("input_dark", BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(getColor("border_dark"), 1),
-                BorderFactory.createEmptyBorder(SPACING_SMALL, SPACING_MEDIUM, SPACING_SMALL, SPACING_MEDIUM)
-        ));
-
-        // Simple padding borders
-        borders.put("padding_small", BorderFactory.createEmptyBorder(
-                SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL
-        ));
-
-        borders.put("padding_medium", BorderFactory.createEmptyBorder(
-                SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM
-        ));
-
-        borders.put("padding_large", BorderFactory.createEmptyBorder(
-                SPACING_LARGE, SPACING_LARGE, SPACING_LARGE, SPACING_LARGE
-        ));
+        initializeColors();
+        initializeFonts();
+        initializeBorders();
     }
 
     /**
-     * Sets the current theme mode.
+     * Initializes the color palette for both light and dark modes.
+     */
+    private void initializeColors() {
+        // --- Core Palette ---
+        colors.put("primary", new Color(79, 70, 229));    // Indigo-600
+        colors.put("primary_light", new Color(99, 102, 241)); // Indigo-500
+        colors.put("primary_dark", new Color(67, 56, 202)); // Indigo-700
+        colors.put("secondary", new Color(139, 92, 246)); // Purple-500
+
+        // --- Semantic Colors ---
+        colors.put("success", new Color(34, 197, 94));    // Green-500
+        colors.put("danger", new Color(239, 68, 68));     // Red-500
+        colors.put("warning", new Color(234, 179, 8));    // Yellow-500
+        colors.put("info", new Color(14, 165, 233));      // Sky-500
+
+        // --- Light Mode UI ---
+        colors.put("background_light", new Color(249, 250, 251)); // Gray-50
+        colors.put("surface_light", Color.WHITE);                 // White
+        colors.put("card_light", Color.WHITE);                    // White
+        colors.put("border_light", new Color(229, 231, 235));     // Gray-200
+        colors.put("input_background_light", Color.WHITE);        // White
+        colors.put("text_primary_light", new Color(17, 24, 39));   // Gray-900
+        colors.put("text_secondary_light", new Color(107, 114, 128)); // Gray-500
+        colors.put("text_disabled_light", new Color(156, 163, 175)); // Gray-400
+        colors.put("selection_background_light", lighten(getColor("primary"), 0.7f)); // Very light primary
+        colors.put("selection_foreground_light", getColor("primary_dark")); // Dark primary text
+
+        // --- Dark Mode UI ---
+        colors.put("background_dark", new Color(17, 24, 39));     // Gray-900
+        colors.put("surface_dark", new Color(31, 41, 55));      // Gray-800
+        colors.put("card_dark", new Color(31, 41, 55));         // Gray-800
+        colors.put("border_dark", new Color(55, 65, 81));       // Gray-700
+        colors.put("input_background_dark", new Color(55, 65, 81)); // Gray-700
+        colors.put("text_primary_dark", new Color(249, 250, 251)); // Gray-50
+        colors.put("text_secondary_dark", new Color(156, 163, 175)); // Gray-400
+        colors.put("text_disabled_dark", new Color(107, 114, 128)); // Gray-500
+        colors.put("selection_background_dark", getColor("primary_dark")); // Dark primary
+        colors.put("selection_foreground_dark", Color.WHITE); // White text
+    }
+
+    /**
+     * Initializes fonts, attempting to use system-appropriate defaults.
+     */
+    private void initializeFonts() {
+        // Determine the base font family based on OS
+        String baseFontFamily = getSystemDefaultFontFamily();
+
+        // Define standard font styles
+        fonts.put("heading_large", new Font(baseFontFamily, Font.BOLD, 20));
+        fonts.put("heading_medium", new Font(baseFontFamily, Font.BOLD, 16));
+        fonts.put("heading_small", new Font(baseFontFamily, Font.BOLD, 14));
+
+        fonts.put("body_regular", new Font(baseFontFamily, Font.PLAIN, 13));
+        fonts.put("body_bold", new Font(baseFontFamily, Font.BOLD, 13));
+        fonts.put("body_medium", new Font(baseFontFamily, Font.PLAIN, 16)); // Larger body text
+
+        fonts.put("small_regular", new Font(baseFontFamily, Font.PLAIN, 11));
+        fonts.put("small_bold", new Font(baseFontFamily, Font.BOLD, 11));
+
+        // Fonts for specific UI elements
+        fonts.put("button", new Font(baseFontFamily, Font.BOLD, 13));
+        fonts.put("label", new Font(baseFontFamily, Font.PLAIN, 13));
+        fonts.put("tab", new Font(baseFontFamily, Font.PLAIN, 13));
+        fonts.put("input", new Font(baseFontFamily, Font.PLAIN, 13)); // Font for text fields, etc.
+    }
+
+    /**
+     * Initializes borders for different UI elements and modes.
+     */
+    private void initializeBorders() {
+        // --- Compound Borders with Padding ---
+
+        // Card borders (line + padding)
+        borders.put("card_light", createCompoundBorder(
+                getColor("border_light"), 1,
+                SPACING_MEDIUM, SPACING_LARGE, SPACING_MEDIUM, SPACING_LARGE
+        ));
+        borders.put("card_dark", createCompoundBorder(
+                getColor("border_dark"), 1,
+                SPACING_MEDIUM, SPACING_LARGE, SPACING_MEDIUM, SPACING_LARGE
+        ));
+
+        // Input field borders (line + padding)
+        borders.put("input_light", createCompoundBorder(
+                getColor("border_light"), 1,
+                SPACING_SMALL, SPACING_MEDIUM, SPACING_SMALL, SPACING_MEDIUM
+        ));
+        borders.put("input_dark", createCompoundBorder(
+                getColor("border_dark"), 1,
+                SPACING_SMALL, SPACING_MEDIUM, SPACING_SMALL, SPACING_MEDIUM
+        ));
+
+        // --- Simple Padding Borders ---
+        borders.put("padding_small", createPaddingBorder(SPACING_SMALL));
+        borders.put("padding_medium", createPaddingBorder(SPACING_MEDIUM));
+        borders.put("padding_large", createPaddingBorder(SPACING_LARGE));
+    }
+
+    // --- Helper Methods for Initialization ---
+
+    /**
+     * Creates a compound border with a line and empty padding.
+     */
+    private Border createCompoundBorder(Color lineColor, int thickness, int top, int left, int bottom, int right) {
+        return BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(lineColor, thickness),
+                BorderFactory.createEmptyBorder(top, left, bottom, right)
+        );
+    }
+
+    /**
+     * Creates an empty border with uniform padding.
+     */
+    private Border createPaddingBorder(int padding) {
+        return BorderFactory.createEmptyBorder(padding, padding, padding, padding);
+    }
+
+    /**
+     * Checks if a specific font family is available on the system.
      *
-     * @param darkMode true for dark mode, false for light mode
+     * @param fontFamilyName The name of the font family to check.
+     * @return true if the font is available, false otherwise.
+     */
+    private boolean isFontAvailable(String fontFamilyName) {
+        GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        String[] availableFonts = ge.getAvailableFontFamilyNames();
+        for (String name : availableFonts) {
+            if (name.equalsIgnoreCase(fontFamilyName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Attempts to get a suitable default system font based on the OS.
+     * Falls back to Java's logical "Dialog" font if system fonts aren't found.
+     *
+     * @return The name of the font family to use.
+     */
+    private String getSystemDefaultFontFamily() {
+        String os = System.getProperty("os.name", "generic").toLowerCase();
+        String fontFamily = "Dialog"; // Default fallback
+
+        if (os.contains("win")) {
+            if (isFontAvailable("Segoe UI")) {
+                fontFamily = "Segoe UI";
+            } else if (isFontAvailable("Arial")) {
+                fontFamily = "Arial";
+            }
+        } else if (os.contains("mac")) {
+            // On macOS, "San Francisco" is the default, but Java often maps "Helvetica Neue" or others.
+            // "Dialog" often resolves well on macOS. Let's try common ones.
+            if (isFontAvailable("San Francisco") || isFontAvailable("SF Pro Text")) {
+                fontFamily = "San Francisco"; // Or "SF Pro Text" if preferred and available
+            } else if (isFontAvailable("Helvetica Neue")) {
+                fontFamily = "Helvetica Neue";
+            } else if (isFontAvailable("Arial")) {
+                fontFamily = "Arial";
+            }
+        } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+            // Linux has diverse defaults, try common ones
+            if (isFontAvailable("Ubuntu")) {
+                fontFamily = "Ubuntu";
+            } else if (isFontAvailable("Noto Sans")) {
+                fontFamily = "Noto Sans";
+            } else if (isFontAvailable("DejaVu Sans")) {
+                fontFamily = "DejaVu Sans";
+            } else if (isFontAvailable("Arial")) {
+                fontFamily = "Arial";
+            }
+        }
+        // If no specific font found, "Dialog" (the initial value) will be used.
+        System.out.println("UIThemeManager: Using font family - " + fontFamily);
+        return fontFamily;
+    }
+
+
+    // --- Theme Mode Management ---
+
+    /**
+     * Sets the current theme mode (light or dark).
+     *
+     * @param darkMode true to activate dark mode, false for light mode.
      */
     public void setDarkMode(boolean darkMode) {
         this.isDarkMode = darkMode;
+        // Optionally: Could trigger a global UI update here if needed,
+        // e.g., by iterating through open windows or using UIManager defaults.
+        // For now, components are expected to re-apply theme when needed.
     }
 
     /**
-     * Checks if dark mode is active.
+     * Checks if dark mode is currently active.
      *
-     * @return true if dark mode is active
+     * @return true if dark mode is active, false otherwise.
      */
     public boolean isDarkMode() {
         return isDarkMode;
     }
 
+    // --- Resource Getters ---
+
     /**
-     * Gets a color by name, adjusted for the current theme mode if applicable.
+     * Gets a color by its semantic name (e.g., "primary", "background").
+     * Automatically returns the correct color variant for the current theme mode.
      *
-     * @param name The color name
-     * @return The Color object, or null if not found
+     * @param name The semantic name of the color.
+     * @return The corresponding Color object, or a default color (magenta) if the name is invalid.
      */
     public Color getColor(String name) {
-        // Handle theme-specific colors
-        if (name.equals("background")) {
-            return isDarkMode ? colors.get("background_dark") : colors.get("background_light");
-        } else if (name.equals("surface")) {
-            return isDarkMode ? colors.get("surface_dark") : colors.get("surface_light");
-        } else if (name.equals("card")) {
-            return isDarkMode ? colors.get("card_dark") : colors.get("card_light");
-        } else if (name.equals("border")) {
-            return isDarkMode ? colors.get("border_dark") : colors.get("border_light");
-        } else if (name.equals("text_primary")) {
-            return isDarkMode ? colors.get("text_primary_dark") : colors.get("text_primary_light");
-        } else if (name.equals("text_secondary")) {
-            return isDarkMode ? colors.get("text_secondary_dark") : colors.get("text_secondary_light");
-        } else if (name.equals("text_disabled")) {
-            return isDarkMode ? colors.get("text_disabled_dark") : colors.get("text_disabled_light");
-        } else if (name.equals("input_background")) {
-            return isDarkMode ? colors.get("input_background_dark") : colors.get("input_background_light");
-        }
+        Objects.requireNonNull(name, "Color name cannot be null");
+        String themeSuffix = isDarkMode ? "_dark" : "_light";
+        Color color = null;
 
-        // Return the exact named color
-        return colors.get(name);
-    }
-
-    /**
-     * Gets a font by name.
-     *
-     * @param name The font name
-     * @return The Font object, or a default font if not found
-     */
-    public Font getFont(String name) {
-        Font font = fonts.get(name);
-        return font != null ? font : new Font("Dialog", Font.PLAIN, 12);
-    }
-
-    /**
-     * Gets a border by name, adjusted for the current theme mode if applicable.
-     *
-     * @param name The border name
-     * @return The Border object, or null if not found
-     */
-    public Border getBorder(String name) {
-        // Handle theme-specific borders
-        if (name.equals("card")) {
-            return isDarkMode ? borders.get("card_dark") : borders.get("card_light");
-        } else if (name.equals("input")) {
-            return isDarkMode ? borders.get("input_dark") : borders.get("input_light");
-        }
-
-        // Return the exact named border
-        return borders.get(name);
-    }
-
-    /**
-     * Applies theme styling to a button.
-     *
-     * @param button The button to style
-     * @param type The button type (primary, secondary, success, danger, warning)
-     */
-    public void styleButton(JButton button, String type) {
-        Color bgColor;
-        Color textColor;
-
-        // Set background color based on type
-        switch (type) {
-            case "primary":
-                bgColor = getColor("primary");
-                break;
-            case "secondary":
-                bgColor = getColor("secondary");
-                break;
-            case "success":
-                bgColor = getColor("success");
-                break;
-            case "danger":
-                bgColor = getColor("danger");
-                break;
-            case "warning":
-                bgColor = getColor("warning");
+        // Check for theme-dependent names first
+        switch (name) {
+            case "background":
+            case "surface":
+            case "card":
+            case "border":
+            case "text_primary":
+            case "text_secondary":
+            case "text_disabled":
+            case "input_background":
+            case "selection_background":
+            case "selection_foreground":
+                color = colors.get(name + themeSuffix);
                 break;
             default:
-                bgColor = getColor("primary");
+                // Check if it's a direct color name (e.g., "primary", "danger")
+                color = colors.get(name);
+                // If not found directly, check if it's a theme-specific name missed by the switch
+                if (color == null) {
+                    color = colors.get(name + themeSuffix);
+                }
                 break;
         }
 
-        // Determine text color based on background brightness
-        double luminance = (0.299 * bgColor.getRed() + 0.587 * bgColor.getGreen() + 0.114 * bgColor.getBlue()) / 255;
-        textColor = luminance > 0.5 ? Color.BLACK : Color.WHITE;
 
-        // Apply styling
-        button.setBackground(bgColor);
+        if (color == null) {
+            System.err.println("Warning: UIThemeManager - Color not found for name: " + name);
+            return Color.MAGENTA; // Return a noticeable default for missing colors
+        }
+        return color;
+    }
+
+    /**
+     * Gets a font by its semantic name (e.g., "body_regular", "heading_medium").
+     *
+     * @param name The semantic name of the font.
+     * @return The corresponding Font object, or a default "Dialog" font if the name is invalid.
+     */
+    public Font getFont(String name) {
+        Objects.requireNonNull(name, "Font name cannot be null");
+        Font font = fonts.get(name);
+        if (font == null) {
+            System.err.println("Warning: UIThemeManager - Font not found for name: " + name);
+            return new Font("Dialog", Font.PLAIN, 12); // Default fallback font
+        }
+        return font;
+    }
+
+    /**
+     * Gets a border by its semantic name (e.g., "card", "input", "padding_medium").
+     * Automatically returns the correct border variant for the current theme mode.
+     *
+     * @param name The semantic name of the border.
+     * @return The corresponding Border object, or null if the name is invalid.
+     */
+    public Border getBorder(String name) {
+        Objects.requireNonNull(name, "Border name cannot be null");
+        String themeSuffix = isDarkMode ? "_dark" : "_light";
+        Border border = null;
+
+        switch (name) {
+            case "card":
+            case "input":
+                border = borders.get(name + themeSuffix);
+                break;
+            default:
+                // Check for direct border names (e.g., "padding_small")
+                border = borders.get(name);
+                // If not found directly, check if it's a theme-specific name missed by the switch
+                if (border == null) {
+                    border = borders.get(name + themeSuffix);
+                }
+                break;
+        }
+
+        if (border == null) {
+            System.err.println("Warning: UIThemeManager - Border not found for name: " + name);
+            // Return a simple empty border as a fallback instead of null
+            return BorderFactory.createEmptyBorder();
+        }
+        return border;
+    }
+
+    // --- Component Styling Methods ---
+
+    /**
+     * Applies standard theme styling to a JButton.
+     * Includes background, foreground (with contrast check), font, padding, and hover/press effects.
+     *
+     * @param button The JButton to style.
+     * @param type   The semantic type of the button (e.g., "primary", "secondary", "danger"). Determines the base color.
+     */
+    public void styleButton(JButton button, String type) {
+        Objects.requireNonNull(button, "Button cannot be null");
+        Objects.requireNonNull(type, "Button type cannot be null");
+
+        Color baseColor = getColor(type); // Get base color (e.g., "primary", "danger")
+        if (baseColor == Color.MAGENTA) { // Check if color lookup failed
+            System.err.println("Warning: Invalid button type '" + type + "'. Using primary color.");
+            baseColor = getColor("primary");
+        }
+
+        // Determine text color for good contrast
+        Color textColor = getTextColorForBackground(baseColor);
+
+        // Apply base styles
+        button.setBackground(baseColor);
         button.setForeground(textColor);
         button.setFont(getFont("button"));
-        button.setFocusPainted(false);
-        button.setBorderPainted(false);
-        button.setOpaque(true);
+        button.setFocusPainted(false); // Remove focus border
+        button.setBorderPainted(false); // Use background color instead of border
+        button.setOpaque(true); // Ensure background color is visible
+        // Apply padding using a border
         button.setBorder(BorderFactory.createEmptyBorder(SPACING_MEDIUM, SPACING_LARGE, SPACING_MEDIUM, SPACING_LARGE));
 
-        // Add hover effect
-        final Color baseColor = bgColor;
-        final Color hoverColor = isDarkMode ? lighten(bgColor, 0.2f) : darken(bgColor, 0.1f);
-        final Color pressedColor = isDarkMode ? lighten(bgColor, 0.1f) : darken(bgColor, 0.2f);
+        // --- Add Hover/Press Effects ---
+        // Calculate hover and pressed colors based on theme mode
+        final Color hoverColor = isDarkMode ? lighten(baseColor, 0.15f) : darken(baseColor, 0.1f);
+        final Color pressedColor = isDarkMode ? lighten(baseColor, 0.1f) : darken(baseColor, 0.2f);
+        final Color finalBaseColor = baseColor; // Final variable for use in listener
 
-        // Remove existing mouse listeners to prevent duplicates
+        // Remove previous listeners added by this method to prevent duplicates
         for (java.awt.event.MouseListener ml : button.getMouseListeners()) {
-            if (ml.getClass().getName().contains("UIThemeManager")) {
+            if (ml instanceof ButtonHoverListener) { // Identify our specific listener
                 button.removeMouseListener(ml);
             }
         }
 
-        button.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseEntered(java.awt.event.MouseEvent e) {
-                if (button.isEnabled()) {
-                    button.setBackground(hoverColor);
-                }
-            }
-
-            @Override
-            public void mouseExited(java.awt.event.MouseEvent e) {
-                if (button.isEnabled()) {
-                    button.setBackground(baseColor);
-                }
-            }
-
-            @Override
-            public void mousePressed(java.awt.event.MouseEvent e) {
-                if (button.isEnabled()) {
-                    button.setBackground(pressedColor);
-                }
-            }
-
-            @Override
-            public void mouseReleased(java.awt.event.MouseEvent e) {
-                if (button.isEnabled()) {
-                    if (button.contains(e.getPoint())) {
-                        button.setBackground(hoverColor);
-                    } else {
-                        button.setBackground(baseColor);
-                    }
-                }
-            }
-        });
+        // Add the new listener
+        button.addMouseListener(new ButtonHoverListener(finalBaseColor, hoverColor, pressedColor));
     }
 
     /**
-     * Applies theme styling to a panel as a card.
+     * Applies theme styling to a JPanel to make it look like a card.
+     * Sets background and border based on the current theme.
      *
-     * @param panel The panel to style
+     * @param panel The JPanel to style.
      */
     public void styleCardPanel(JPanel panel) {
+        Objects.requireNonNull(panel, "Panel cannot be null");
         panel.setBackground(getColor("card"));
         panel.setBorder(getBorder("card"));
+        panel.setOpaque(true); // Ensure card background is painted
     }
 
     /**
-     * Applies theme styling to a label.
+     * Applies theme styling to a JLabel.
+     * Sets font and foreground color based on the specified type.
      *
-     * @param label The label to style
-     * @param type The label type (primary, secondary, heading, etc.)
+     * @param label The JLabel to style.
+     * @param type  The semantic type of the label (e.g., "primary", "secondary", "heading_medium").
      */
     public void styleLabel(JLabel label, String type) {
+        Objects.requireNonNull(label, "Label cannot be null");
+        Objects.requireNonNull(type, "Label type cannot be null");
+
+        Font font;
+        Color color;
+
         switch (type) {
             case "heading_large":
-                label.setFont(getFont("heading_large"));
-                label.setForeground(getColor("text_primary"));
+                font = getFont("heading_large");
+                color = getColor("text_primary");
                 break;
             case "heading_medium":
-                label.setFont(getFont("heading_medium"));
-                label.setForeground(getColor("text_primary"));
+                font = getFont("heading_medium");
+                color = getColor("text_primary");
                 break;
             case "heading_small":
-                label.setFont(getFont("heading_small"));
-                label.setForeground(getColor("text_primary"));
+                font = getFont("heading_small");
+                color = getColor("text_primary");
                 break;
             case "secondary":
-                label.setFont(getFont("body_regular"));
-                label.setForeground(getColor("text_secondary"));
+                font = getFont("body_regular");
+                color = getColor("text_secondary");
                 break;
+            case "disabled":
+                font = getFont("body_regular");
+                color = getColor("text_disabled");
+                break;
+            case "primary": // Style like primary text
             default:
-                label.setFont(getFont("body_regular"));
-                label.setForeground(getColor("text_primary"));
+                font = getFont("body_regular");
+                color = getColor("text_primary");
                 break;
         }
+        label.setFont(font);
+        label.setForeground(color);
     }
 
     /**
-     * Applies theme styling to a tab in a JTabbedPane.
+     * Applies basic theme styling to a JTabbedPane.
+     * Sets background, foreground, font, and removes the default content border.
+     * Note: Styling selected tabs requires more complex UI delegate manipulation.
      *
-     * @param tabbedPane The tabbed pane
+     * @param tabbedPane The JTabbedPane to style.
      */
     public void styleTabbedPane(JTabbedPane tabbedPane) {
+        Objects.requireNonNull(tabbedPane, "TabbedPane cannot be null");
+
+        // Set overall background and foreground for the tab area
+        tabbedPane.setBackground(getColor("surface")); // Use surface color for tab area background
+        tabbedPane.setForeground(getColor("text_secondary")); // Default text color for unselected tabs
         tabbedPane.setFont(getFont("tab"));
-        tabbedPane.setBackground(getColor("background"));
-        tabbedPane.setForeground(getColor("text_primary"));
-        tabbedPane.setBorder(BorderFactory.createEmptyBorder(
-                SPACING_MEDIUM, SPACING_MEDIUM, 0, SPACING_MEDIUM));
+
+        // Remove the default border around the content area for a cleaner look
+        UIManager.put("TabbedPane.contentBorderInsets", new Insets(0, 0, 0, 0));
+        UIManager.put("TabbedPane.tabsOverlapBorder", true); // Modern look
+
+        // Optionally set padding for tabs
+        // UIManager.put("TabbedPane.tabInsets", new Insets(SPACING_SMALL, SPACING_LARGE, SPACING_SMALL, SPACING_LARGE));
+
+        // Basic selected tab color (might be overridden by Look and Feel)
+        // UIManager.put("TabbedPane.selected", getColor("background")); // Selected tab background
+        // UIManager.put("TabbedPane.selectedForeground", getColor("text_primary")); // Selected tab text
+
+        // Force update UI if Look and Feel changes might affect it
+        SwingUtilities.updateComponentTreeUI(tabbedPane);
+
+        // Add padding around the entire component if desired
+        tabbedPane.setBorder(BorderFactory.createEmptyBorder(SPACING_MEDIUM, SPACING_MEDIUM, 0, SPACING_MEDIUM));
     }
 
     /**
-     * Lightens a color by a specified factor.
+     * Applies theme styling to text components like JTextField, JTextArea, JPasswordField.
+     * Sets background, foreground, selection colors, font, and border.
      *
-     * @param color The color to lighten
-     * @param factor The factor to lighten by (0-1)
-     * @return The lightened color
+     * @param component The JTextComponent to style.
+     */
+    public void styleTextComponent(javax.swing.text.JTextComponent component) {
+        Objects.requireNonNull(component, "Text component cannot be null");
+
+        component.setBackground(getColor("input_background"));
+        component.setForeground(getColor("text_primary"));
+        component.setCaretColor(getColor("text_primary")); // Make caret visible
+        component.setFont(getFont("input"));
+        component.setBorder(getBorder("input"));
+
+        // Set selection colors
+        component.setSelectionColor(getColor("selection_background"));
+        component.setSelectedTextColor(getColor("selection_foreground"));
+
+        // Add padding within the component (handled by the 'input' border)
+    }
+
+
+    // --- Color Utility Methods ---
+
+    /**
+     * Calculates whether white or black text provides better contrast against a given background color.
+     * Uses a simple luminance calculation.
+     *
+     * @param background The background color.
+     * @return Color.WHITE or Color.BLACK.
+     */
+    public static Color getTextColorForBackground(Color background) {
+        Objects.requireNonNull(background, "Background color cannot be null");
+        // Calculate luminance (simplified formula)
+        double luminance = (0.299 * background.getRed() + 0.587 * background.getGreen() + 0.114 * background.getBlue()) / 255.0;
+        // Return black for light backgrounds, white for dark backgrounds
+        return luminance > 0.5 ? Color.BLACK : Color.WHITE;
+    }
+
+
+    /**
+     * Lightens a given color by a specified factor.
+     *
+     * @param color  The original color.
+     * @param factor The factor to lighten by (0.0 to 1.0). 0.0 means no change, 1.0 means white.
+     * @return The lightened color.
      */
     public static Color lighten(Color color, float factor) {
+        Objects.requireNonNull(color, "Color cannot be null");
+        factor = Math.max(0.0f, Math.min(1.0f, factor)); // Clamp factor
         int r = color.getRed();
         int g = color.getGreen();
         int b = color.getBlue();
@@ -410,13 +570,15 @@ public class UIThemeManager {
     }
 
     /**
-     * Darkens a color by a specified factor.
+     * Darkens a given color by a specified factor.
      *
-     * @param color The color to darken
-     * @param factor The factor to darken by (0-1)
-     * @return The darkened color
+     * @param color  The original color.
+     * @param factor The factor to darken by (0.0 to 1.0). 0.0 means no change, 1.0 means black.
+     * @return The darkened color.
      */
     public static Color darken(Color color, float factor) {
+        Objects.requireNonNull(color, "Color cannot be null");
+        factor = Math.max(0.0f, Math.min(1.0f, factor)); // Clamp factor
         int r = color.getRed();
         int g = color.getGreen();
         int b = color.getBlue();
@@ -428,39 +590,61 @@ public class UIThemeManager {
         return new Color(r, g, b, color.getAlpha());
     }
 
+    // --- Private Inner Class for Button Hover Effects ---
+
     /**
-     * Checks if a font is available on the system.
-     *
-     * @param fontName The font name to check
-     * @return true if the font is available
+     * MouseAdapter specifically for handling button hover and press effects
+     * according to the theme manager's styling.
      */
-    private boolean isFontAvailable(String fontName) {
-        GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-        String[] fontNames = ge.getAvailableFontFamilyNames();
-        for (String name : fontNames) {
-            if (name.equalsIgnoreCase(fontName)) {
-                return true;
+    private static class ButtonHoverListener extends MouseAdapter {
+        private final Color baseColor;
+        private final Color hoverColor;
+        private final Color pressedColor;
+
+        ButtonHoverListener(Color baseColor, Color hoverColor, Color pressedColor) {
+            this.baseColor = baseColor;
+            this.hoverColor = hoverColor;
+            this.pressedColor = pressedColor;
+        }
+
+        @Override
+        public void mouseEntered(MouseEvent e) {
+            JButton button = (JButton) e.getSource();
+            if (button.isEnabled()) {
+                button.setBackground(hoverColor);
             }
         }
-        return false;
-    }
 
-    /**
-     * Gets the appropriate system font family based on the OS.
-     *
-     * @return The system font family name
-     */
-    private String getSystemFontFamily() {
-        String os = System.getProperty("os.name").toLowerCase();
+        @Override
+        public void mouseExited(MouseEvent e) {
+            JButton button = (JButton) e.getSource();
+            if (button.isEnabled()) {
+                // Reset to base color only if not currently pressed
+                if (!button.getModel().isPressed()) {
+                    button.setBackground(baseColor);
+                }
+            }
+        }
 
-        if (os.contains("mac")) {
-            return "SF Pro Text"; // macOS system font
-        } else if (os.contains("win")) {
-            return "Segoe UI"; // Windows system font
-        } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
-            return "Ubuntu"; // Common Linux font
-        } else {
-            return "Dialog"; // Java default font
+        @Override
+        public void mousePressed(MouseEvent e) {
+            JButton button = (JButton) e.getSource();
+            if (button.isEnabled()) {
+                button.setBackground(pressedColor);
+            }
+        }
+
+        @Override
+        public void mouseReleased(MouseEvent e) {
+            JButton button = (JButton) e.getSource();
+            if (button.isEnabled()) {
+                // If mouse is still over the button, set hover color, otherwise base color
+                if (button.contains(e.getPoint())) {
+                    button.setBackground(hoverColor);
+                } else {
+                    button.setBackground(baseColor);
+                }
+            }
         }
     }
 }

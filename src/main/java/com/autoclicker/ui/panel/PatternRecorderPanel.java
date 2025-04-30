@@ -1,6 +1,6 @@
 package com.autoclicker.ui.panel;
 
-import com.autoclicker.core.model.ClickPattern;// Import base listener
+import com.autoclicker.core.model.ClickPattern;
 import com.autoclicker.core.service.PatternService;
 import com.autoclicker.service.pattern.PatternRecorderService;
 import com.autoclicker.ui.frame.MainFrame;
@@ -17,6 +17,7 @@ import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit; // For formatting duration
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -30,8 +31,11 @@ interface PatternRecorderListener extends PatternService.PatternListener {
 /**
  * Panel for recording, managing, and playing back click patterns.
  * Interacts with PatternRecorderService and updates the UI accordingly.
+ * Fixed issues with JScrollPane initialization for FlatLaf compatibility.
  */
 public class PatternRecorderPanel extends JPanel implements PatternRecorderListener {
+    private static final Logger LOGGER = Logger.getLogger(PatternRecorderPanel.class.getName());
+
     private final PatternRecorderService recorderService;
     private final MainFrame parentFrame; // For theme access
 
@@ -131,26 +135,21 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
         this.recorderService = recorderService;
         this.parentFrame = parentFrame;
 
-        initializeComponents(); // Set up Swing components
-        setupListeners(); // Add action listeners to buttons etc.
-        applyThemeColors(); // Apply initial theme
+        // Use a simple BorderLayout initially, populate components later
+        setLayout(new BorderLayout());
+
+        // Initialize components on the EDT to avoid UI threading issues
+        SwingUtilities.invokeLater(this::initializeComponents);
 
         // Register this panel as a listener to the service
         this.recorderService.addListener(this);
-
-        // Start timer for status updates (like recording duration)
-        startStatusUpdateTimer();
-
-        // Initial UI state update
-        updateButtonStates();
-        updateStatusDisplay();
     }
 
     /**
      * Initializes all Swing components and lays them out.
+     * Called from the EDT to ensure proper component initialization.
      */
     private void initializeComponents() {
-        setLayout(new BorderLayout(HORIZONTAL_GAP, VERTICAL_GAP));
         setBorder(new EmptyBorder(15, 15, 15, 15)); // Padding around the panel
 
         // --- Left Panel (Pattern List & Controls) ---
@@ -162,13 +161,14 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
         JLabel patternsHeader = createSectionHeader("Saved Patterns");
         leftPanel.add(patternsHeader, BorderLayout.NORTH);
 
-        // List
+        // List - Create model and list first, before scroll pane
         patternListModel = new DefaultListModel<>();
         patternList = new JList<>(patternListModel);
         patternList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         patternList.setVisibleRowCount(10); // Suggest height
-        JScrollPane patternScrollPane = new JScrollPane(patternList);
-        patternScrollPane.setBorder(BorderFactory.createLineBorder(BORDER_COLOR_LIGHT)); // Default border
+
+        // Create scroll pane AFTER the list is fully initialized
+        JScrollPane patternScrollPane = createScrollPane(patternList);
         leftPanel.add(patternScrollPane, BorderLayout.CENTER);
 
         // Controls (Record, Play, Stop, Delete)
@@ -195,7 +195,7 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
         JLabel detailsHeader = createSectionHeader("Pattern Details");
         rightPanel.add(detailsHeader, BorderLayout.NORTH);
 
-        // Clicks Table
+        // Clicks Table - Create model and table first, before scroll pane
         clicksTableModel = new ClicksTableModel();
         clicksTable = new JTable(clicksTableModel);
         clicksTable.setFillsViewportHeight(true); // Table uses available space
@@ -217,9 +217,8 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
         clicksTable.getColumnModel().getColumn(3).setPreferredWidth(70);  // Button
         clicksTable.getColumnModel().getColumn(4).setPreferredWidth(90);  // Click Type
 
-
-        JScrollPane tableScrollPane = new JScrollPane(clicksTable);
-        tableScrollPane.setBorder(BorderFactory.createLineBorder(BORDER_COLOR_LIGHT)); // Default border
+        // Create scroll pane AFTER table is fully initialized
+        JScrollPane tableScrollPane = createScrollPane(clicksTable);
         rightPanel.add(tableScrollPane, BorderLayout.CENTER);
 
         // --- Status Area (Bottom Right) ---
@@ -250,14 +249,57 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
         rightPanel.add(statusAreaPanel, BorderLayout.SOUTH);
 
         // --- Main Layout ---
-        // Use a Split Pane for resizable layout
+        // Use a Split Pane for resizable layout - create it last after both panels are fully initialized
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, rightPanel);
         splitPane.setResizeWeight(0.35); // Adjust initial split ratio if needed
         splitPane.setBorder(null); // Remove split pane border
         splitPane.setOpaque(false);
         splitPane.setContinuousLayout(true); // Update layout while dragging divider
 
+        // Add the split pane to the main panel
         add(splitPane, BorderLayout.CENTER);
+
+        // Setup listeners - do this after all components are created
+        setupListeners();
+
+        // Start the status update timer
+        startStatusUpdateTimer();
+
+        // Apply initial theme colors
+        applyThemeColors();
+
+        // Update the initial button states
+        updateButtonStates();
+
+        // Update the display with initial status
+        updateStatusDisplay();
+
+        // Load the patterns from the service
+        List<String> patternNames = recorderService.getPatternNames();
+        updatePatternList(patternNames);
+    }
+
+    /**
+     * Creates a JScrollPane for a component with safe initialization for FlatLaf.
+     * This method avoids the NPE in BasicScrollBarUI.layoutVScrollbar.
+     */
+    private JScrollPane createScrollPane(Component view) {
+        // First create a basic scroll pane without the view
+        JScrollPane scrollPane = new JScrollPane();
+
+        // Then apply minimal styling
+        scrollPane.setBorder(BorderFactory.createLineBorder(
+                parentFrame.isDarkMode() ? BORDER_COLOR_DARK : BORDER_COLOR_LIGHT
+        ));
+
+        // Set the view once the scroll pane is fully initialized
+        scrollPane.setViewportView(view);
+
+        // Set policies after the view is set
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+
+        return scrollPane;
     }
 
     /**
@@ -322,11 +364,12 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
         patternList.setForeground(textColor);
         patternList.setSelectionBackground(primaryColor);
         patternList.setSelectionForeground(Color.WHITE); // Ensure contrast on selection
-        Component patternScrollPane = patternList.getParent().getParent(); // Get the JScrollPane
+        Component patternScrollPane = patternList.getParent() != null && patternList.getParent().getParent() != null ?
+                patternList.getParent().getParent() : null; // Get the JScrollPane
+
         if (patternScrollPane instanceof JScrollPane) {
             ((JScrollPane) patternScrollPane).setBorder(BorderFactory.createLineBorder(borderColor));
         }
-
 
         // Update table
         clicksTable.setBackground(cardBgColor);
@@ -334,13 +377,18 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
         clicksTable.setGridColor(borderColor);
         clicksTable.setSelectionBackground(primaryColor);
         clicksTable.setSelectionForeground(Color.WHITE);
-        clicksTable.getTableHeader().setBackground(parentFrame.isDarkMode() ? new Color(55, 65, 81) : new Color(240, 240, 240));
-        clicksTable.getTableHeader().setForeground(textColor);
-        Component tableScrollPane = clicksTable.getParent().getParent(); // Get the JScrollPane
+
+        if (clicksTable.getTableHeader() != null) {
+            clicksTable.getTableHeader().setBackground(parentFrame.isDarkMode() ? new Color(55, 65, 81) : new Color(240, 240, 240));
+            clicksTable.getTableHeader().setForeground(textColor);
+        }
+
+        Component tableScrollPane = clicksTable.getParent() != null && clicksTable.getParent().getParent() != null ?
+                clicksTable.getParent().getParent() : null; // Get the JScrollPane
+
         if (tableScrollPane instanceof JScrollPane) {
             ((JScrollPane) tableScrollPane).setBorder(BorderFactory.createLineBorder(borderColor));
         }
-
 
         // Update buttons (pass color based on function)
         styleButton(recordButton, successColor);
@@ -371,6 +419,8 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
      * Handles enabled/disabled look.
      */
     private void styleButton(JButton button, Color enabledColor) {
+        if (button == null) return;
+
         Color disabledColor = enabledColor.darker(); // Or a specific gray
         Color currentBgColor = button.isEnabled() ? enabledColor : disabledColor;
 
@@ -383,7 +433,6 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
         button.setOpaque(true); // Required for background color to show
         button.setBorderPainted(false); // Flat look
     }
-
 
     /**
      * Starts the timer that periodically calls `updateStatusDisplay`.
@@ -475,7 +524,6 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
         return String.format("%02d:%02d.%03d", minutes, seconds, remainingMillis);
     }
 
-
     /**
      * Updates the list of pattern names displayed.
      * Called by the listener when the service's pattern list changes.
@@ -483,24 +531,34 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
      * @param patternNames List of names from the service.
      */
     private void updatePatternList(List<String> patternNames) {
-        String selectedValue = patternList.getSelectedValue(); // Preserve selection if possible
+        if (patternList == null || patternListModel == null) return;
 
-        patternListModel.clear();
-        for (String name : patternNames) {
-            patternListModel.addElement(name);
-        }
+        // Get current selection before updating
+        String selectedValue = patternList.getSelectedValue();
 
-        // Try to re-select the previously selected item
-        if (selectedValue != null && patternListModel.contains(selectedValue)) {
-            patternList.setSelectedValue(selectedValue, true); // Scroll to selection
-        } else {
-            // If previous selection gone, clear details
-            selectedPatternDetail = null;
-            clicksTableModel.setClickPoints(null);
-        }
+        // Update the model with new pattern names
+        SwingUtilities.invokeLater(() -> {
+            patternListModel.clear();
+            if (patternNames != null) {
+                for (String name : patternNames) {
+                    patternListModel.addElement(name);
+                }
+            }
 
-        updateButtonStates(); // Enable/disable buttons based on list content/selection
-        updateStatusDisplay(); // Update status based on selection
+            // Try to re-select the previously selected item
+            if (selectedValue != null && patternListModel.contains(selectedValue)) {
+                patternList.setSelectedValue(selectedValue, true); // Scroll to selection
+            } else {
+                // If previous selection gone, clear details
+                selectedPatternDetail = null;
+                if (clicksTableModel != null) {
+                    clicksTableModel.setClickPoints(null);
+                }
+            }
+
+            updateButtonStates(); // Enable/disable buttons based on list content/selection
+            updateStatusDisplay(); // Update status based on selection
+        });
     }
 
     /**
@@ -508,26 +566,38 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
      * Fetches the details of the selected pattern and updates the table.
      */
     private void updatePatternSelection() {
+        if (patternList == null) return;
+
         String selectedName = patternList.getSelectedValue();
 
         if (selectedName != null) {
             // Fetch pattern details from the service (returns a copy)
             selectedPatternDetail = recorderService.getPattern(selectedName);
 
-            if (selectedPatternDetail != null) {
+            if (selectedPatternDetail != null && clicksTableModel != null) {
                 clicksTableModel.setClickPoints(selectedPatternDetail.getClickPoints());
-                clicksTable.setEnabled(true); // Enable table interaction
+                if (clicksTable != null) {
+                    clicksTable.setEnabled(true); // Enable table interaction
+                }
             } else {
                 // Should not happen if name is in list, but handle defensively
                 LOGGER.warning("Selected pattern name '" + selectedName + "' not found in service.");
-                clicksTableModel.setClickPoints(null);
-                clicksTable.setEnabled(false);
+                if (clicksTableModel != null) {
+                    clicksTableModel.setClickPoints(null);
+                }
+                if (clicksTable != null) {
+                    clicksTable.setEnabled(false);
+                }
             }
         } else {
             // No selection
             selectedPatternDetail = null;
-            clicksTableModel.setClickPoints(null);
-            clicksTable.setEnabled(false);
+            if (clicksTableModel != null) {
+                clicksTableModel.setClickPoints(null);
+            }
+            if (clicksTable != null) {
+                clicksTable.setEnabled(false);
+            }
         }
 
         // Update UI elements based on the new selection state
@@ -546,22 +616,22 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
         boolean hasSelection = selectedPatternDetail != null; // Based on detailed pattern loaded
         boolean isActive = isRecording || isPlaying; // If either recording or playing
 
-        // Enable/Disable buttons
-        recordButton.setEnabled(!isActive);
-        stopButton.setEnabled(isActive);
-        playButton.setEnabled(!isActive && hasSelection);
-        pauseButton.setEnabled(isPlaying); // Enable pause whenever playing
-        deleteButton.setEnabled(!isActive && hasSelection);
-
-        // Update Pause/Resume button text
-        pauseButton.setText(isPaused ? "Resume" : "Pause");
+        // Enable/Disable buttons - check for null to avoid NPEs
+        if (recordButton != null) recordButton.setEnabled(!isActive);
+        if (stopButton != null) stopButton.setEnabled(isActive);
+        if (playButton != null) playButton.setEnabled(!isActive && hasSelection);
+        if (pauseButton != null) {
+            pauseButton.setEnabled(isPlaying);
+            pauseButton.setText(isPaused ? "Resume" : "Pause");
+        }
+        if (deleteButton != null) deleteButton.setEnabled(!isActive && hasSelection);
 
         // Disable list interaction and loop checkbox when active
-        patternList.setEnabled(!isActive);
-        loopCheckBox.setEnabled(!isActive && hasSelection); // Can only loop if selected & idle
+        if (patternList != null) patternList.setEnabled(!isActive);
+        if (loopCheckBox != null) loopCheckBox.setEnabled(!isActive && hasSelection);
 
         // Disable table interaction during active states
-        clicksTable.setEnabled(!isActive);
+        if (clicksTable != null) clicksTable.setEnabled(!isActive);
 
         // Re-apply theme styles to reflect enabled/disabled state visually
         applyThemeColors();
@@ -602,9 +672,9 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
         }
 
         // Clear current selection and details before starting
-        patternList.clearSelection();
+        if (patternList != null) patternList.clearSelection();
         selectedPatternDetail = null;
-        clicksTableModel.setClickPoints(null);
+        if (clicksTableModel != null) clicksTableModel.setClickPoints(null);
         recordingStartTime = System.currentTimeMillis(); // Reset timer start
 
         // Tell the service to start recording
@@ -620,7 +690,8 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
     private void playSelectedPattern() {
         if (selectedPatternDetail != null) {
             LOGGER.info("Requesting playback for: " + selectedPatternDetail.getName());
-            recorderService.playPattern(selectedPatternDetail.getName(), loopCheckBox.isSelected());
+            boolean loop = (loopCheckBox != null) && loopCheckBox.isSelected();
+            recorderService.playPattern(selectedPatternDetail.getName(), loop);
             // UI updates handled by onPlaybackStateChanged listener
         } else {
             LOGGER.warning("Play button clicked but no pattern selected.");
@@ -680,7 +751,7 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
                     );
                     // Explicitly clear selection details after delete
                     selectedPatternDetail = null;
-                    clicksTableModel.setClickPoints(null);
+                    if (clicksTableModel != null) clicksTableModel.setClickPoints(null);
                     updateButtonStates();
                     updateStatusDisplay();
 
@@ -759,7 +830,9 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
                 // (This check might be fragile if names change, but good for now)
                 if (selectedPatternDetail == null || pattern.getName().equals(selectedPatternDetail.getName())) {
                     selectedPatternDetail = pattern; // Update the local copy
-                    clicksTableModel.setClickPoints(pattern.getClickPoints());
+                    if (clicksTableModel != null) {
+                        clicksTableModel.setClickPoints(pattern.getClickPoints());
+                    }
                     LOGGER.finest("UI Listener: Pattern updated (recording) -> " + pattern.getName() + ", clicks=" + pattern.getClickCount());
                 }
             }
@@ -786,7 +859,4 @@ public class PatternRecorderPanel extends JPanel implements PatternRecorderListe
             // Status display will be updated by the timer
         });
     }
-
-    // Logger instance for UI panel logging
-    private static final Logger LOGGER = Logger.getLogger(PatternRecorderPanel.class.getName());
 }

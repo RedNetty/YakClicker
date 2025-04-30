@@ -1,47 +1,57 @@
 package com.autoclicker.ui.panel;
 
-import com.autoclicker.application.YakClickerApp;
 import com.autoclicker.service.click.AutoClickerService;
 import com.autoclicker.service.keybind.KeybindManager;
 import com.autoclicker.storage.SettingsManager;
 import com.autoclicker.ui.frame.MainFrame;
+import com.autoclicker.ui.theme.UIThemeManager;
 import com.autoclicker.util.PlatformDetector;
+import com.autoclicker.util.UIUtils;
 
 import javax.swing.*;
 import javax.swing.border.Border;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 /**
- * Control panel for the AutoClicker application, providing settings and controls.
- * Redesigned with a modern UI using consistent styling for smooth appearance.
- * Updated to include controls for all hotkeys managed by KeybindManager.
+ * Enhanced control panel for the AutoClicker application, providing settings and controls.
+ * Redesigned with a modern UI using consistent styling for smooth appearance across the application.
+ * Uses UIThemeManager for consistent theming and UIUtils for component styling.
  */
 public class ControlPanel extends JPanel {
     private final AutoClickerService clickerService;
     private final SettingsManager settingsManager;
     private final MainFrame parentFrame;
+    private final UIThemeManager themeManager;
 
-    // UI Components
-    private JButton startButton;
-    private JButton stopButton;
+    // UI Components - grouped by category
+    // Click Settings Components
     private JSlider cpsSlider;
     private JSpinner cpsSpinner;
     private JComboBox<String> clickModeComboBox;
     private JComboBox<String> mouseButtonComboBox;
+
+    // Humanization Components
     private JCheckBox randomizeIntervalCheckBox;
     private JSlider randomizationFactorSlider;
     private JLabel randomizationValueLabel;
     private JCheckBox randomMovementCheckBox;
     private JSpinner movementRadiusSpinner;
+
     // Hotkey Components
     private JComboBox<String> toggleHotkeyComboBox;
     private JComboBox<String> visibilityHotkeyComboBox;
-    private JComboBox<String> pauseHotkeyComboBox; // New
-    private JComboBox<String> increaseSpeedHotkeyComboBox; // New
-    private JComboBox<String> decreaseSpeedHotkeyComboBox; // New
+    private JComboBox<String> pauseHotkeyComboBox;
+    private JComboBox<String> increaseSpeedHotkeyComboBox;
+    private JComboBox<String> decreaseSpeedHotkeyComboBox;
+
     // Appearance Components
     private JCheckBox alwaysOnTopCheckBox;
     private JSlider transparencySlider;
@@ -50,19 +60,20 @@ public class ControlPanel extends JPanel {
     private JCheckBox autoHideCheckBox;
     private JButton toggleThemeButton;
 
+    // Control Buttons
+    private JButton startButton;
+    private JButton stopButton;
+
+    // Component caches for theme updates
+    private final Map<JComponent, Color> originalBackgrounds = new HashMap<>();
+    private final Map<JComponent, Color> originalForegrounds = new HashMap<>();
+
     // Constants for layout
     private static final int VERTICAL_GAP = 15;
     private static final int HORIZONTAL_GAP = 10;
     private static final int PANEL_PADDING = 15;
-    private static final int CARD_INTERNAL_PADDING = 12;
-    private static final int SECTION_HEADER_PADDING = 10;
-
-    // Fonts
-    private static final Font SECTION_HEADER_FONT = new Font("Arial", Font.BOLD, 14);
-    private static final Font CARD_TITLE_FONT = new Font("Arial", Font.BOLD, 13);
-    private static final Font DEFAULT_FONT = new Font("Arial", Font.PLAIN, 13);
-    private static final Font SMALL_ITALIC_FONT = new Font("Arial", Font.ITALIC, 11);
-    private static final Font BUTTON_FONT = new Font("Arial", Font.BOLD, 13);
+    private static final int CARD_PADDING = 12;
+    private static final int SECTION_HEADER_PADDING = 8;
 
     // Constants for component values
     private static final int SLIDER_MIN_CPS = 1;
@@ -71,86 +82,107 @@ public class ControlPanel extends JPanel {
     private static final double SPINNER_MAX_CPS = 500.0;
     private static final double SPINNER_STEP_CPS = 0.1;
 
+    /**
+     * Creates a new ControlPanel.
+     *
+     * @param clickerService The auto clicker service
+     * @param settingsManager The settings manager
+     * @param parentFrame The parent main frame
+     */
     public ControlPanel(AutoClickerService clickerService, SettingsManager settingsManager, MainFrame parentFrame) {
         this.clickerService = clickerService;
         this.settingsManager = settingsManager;
         this.parentFrame = parentFrame;
+        this.themeManager = UIThemeManager.getInstance();
+
         setLayout(new BorderLayout());
-        if (parentFrame != null) {
-            setBackground(parentFrame.getBackgroundColor());
-        } else {
-            setBackground(UIManager.getColor("Panel.background"));
-        }
-        initializeComponents();
-        loadSettingsToUI();
-        applyThemeColors();
+        setBackground(themeManager.getColor("background"));
+
+        // Initialize UI components
+        SwingUtilities.invokeLater(() -> {
+            initializeComponents();
+            loadSettingsToUI();
+            applyThemeColors();
+        });
     }
 
+    /**
+     * Initializes all UI components and adds them to the panel.
+     */
     private void initializeComponents() {
         JTabbedPane tabbedPane = new JTabbedPane();
         tabbedPane.setFocusable(false);
-        // Style applied in applyThemeColors
 
+        // Create tab content panels
         JPanel clickSettingsPanel = createClickSettingsPanel();
         JPanel humanizationPanel = createHumanizationPanel();
         JPanel hotkeysPanel = createHotkeysPanel();
         JPanel appearancePanel = createAppearancePanel();
         JPanel platformPanel = new PlatformSettingsPanel(settingsManager, parentFrame);
 
+        // Add tabs
         tabbedPane.addTab("Clicking", createScrollPane(clickSettingsPanel));
         tabbedPane.addTab("Humanization", createScrollPane(humanizationPanel));
         tabbedPane.addTab("Hotkeys", createScrollPane(hotkeysPanel));
         tabbedPane.addTab("Appearance", createScrollPane(appearancePanel));
         tabbedPane.addTab("Platform", createScrollPane(platformPanel));
 
+        // Create and add the control buttons
         JPanel buttonPanel = createControlButtonPanel();
 
         add(tabbedPane, BorderLayout.CENTER);
         add(buttonPanel, BorderLayout.SOUTH);
     }
 
-    /** Wraps a content panel in a JScrollPane, styled manually. */
+    /**
+     * Creates a scroll pane for tab content with consistent styling.
+     */
     private JScrollPane createScrollPane(JPanel contentPanel) {
-        JScrollPane scrollPane = new JScrollPane(contentPanel);
+        JScrollPane scrollPane = new JScrollPane();
+
+        // Set the viewport view after scrollPane creation
+        scrollPane.setViewportView(contentPanel);
+
+        // Apply styling
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
 
-        Color bgColor = (parentFrame != null) ? parentFrame.getBackgroundColor() : UIManager.getColor("Panel.background");
+        // Set background colors
+        Color bgColor = themeManager.getColor("background");
         scrollPane.getViewport().setBackground(bgColor);
         contentPanel.setBackground(bgColor);
-        contentPanel.setBorder(new EmptyBorder(new Insets(PANEL_PADDING, PANEL_PADDING, PANEL_PADDING, PANEL_PADDING)));
+        contentPanel.setBorder(new EmptyBorder(PANEL_PADDING, PANEL_PADDING, PANEL_PADDING, PANEL_PADDING));
 
         return scrollPane;
     }
 
-    // --- Click Settings Panel ---
+    /**
+     * Creates the click settings panel with speed and options controls.
+     */
     private JPanel createClickSettingsPanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-
-        // Default Constraints
-        gbc.gridx = 0; gbc.gridwidth = 1; gbc.weightx = 1.0;
-        gbc.fill = GridBagConstraints.HORIZONTAL; gbc.anchor = GridBagConstraints.NORTHWEST;
-        gbc.insets = new Insets(0, 0, VERTICAL_GAP, 0);
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setOpaque(false);
 
         // Click Speed Section
-        gbc.gridy = 0; panel.add(createSectionHeader("Click Speed"), gbc);
-        gbc.gridy++; panel.add(createClickSpeedCard(), gbc);
+        panel.add(createSectionHeader("Click Speed"));
+        panel.add(createClickSpeedCard());
+        panel.add(Box.createVerticalStrut(VERTICAL_GAP));
 
         // Click Options Section
-        gbc.gridy++; panel.add(createSectionHeader("Click Options"), gbc);
-        gbc.gridy++; panel.add(createClickOptionsCard(), gbc);
+        panel.add(createSectionHeader("Click Options"));
+        panel.add(createClickOptionsCard());
 
-        // macOS Recommendation
+        // macOS Recommendation Card (conditional)
         if (PlatformDetector.isMacOS()) {
-            gbc.gridy++; panel.add(createMacOsRecommendationCard(), gbc);
+            panel.add(Box.createVerticalStrut(VERTICAL_GAP));
+            panel.add(createMacOsRecommendationCard());
         }
 
-        // Vertical Glue
-        gbc.gridy++; gbc.weighty = 1.0; gbc.fill = GridBagConstraints.BOTH;
-        panel.add(Box.createVerticalGlue(), gbc);
+        // Add flexible spacer at bottom
+        panel.add(Box.createVerticalGlue());
 
         return panel;
     }
@@ -160,24 +192,43 @@ public class ControlPanel extends JPanel {
         card.setLayout(new BorderLayout(HORIZONTAL_GAP, VERTICAL_GAP / 2));
 
         JLabel cpsTitleLabel = new JLabel("Clicks Per Second (CPS)");
-        cpsTitleLabel.setFont(CARD_TITLE_FONT);
+        cpsTitleLabel.setFont(UIThemeManager.getInstance().getFont("Dialog"));
         card.add(cpsTitleLabel, BorderLayout.NORTH);
 
-        // Panel for slider and spinner
+        // Panel for slider and value display similar to randomization panel
         JPanel cpsControlPanel = new JPanel(new BorderLayout(HORIZONTAL_GAP, 0));
         cpsControlPanel.setOpaque(false);
+        cpsControlPanel.setBorder(new EmptyBorder(8, 5, 5, 5));
 
+        // Fixed-width label for "Value:"
+        JLabel valueLabel = new JLabel("Value:");
+        valueLabel.setPreferredSize(new Dimension(70, valueLabel.getPreferredSize().height));
+        cpsControlPanel.add(valueLabel, BorderLayout.WEST);
+
+        // Center slider
         cpsSlider = new JSlider(SLIDER_MIN_CPS, SLIDER_MAX_CPS, (int) settingsManager.getCPS());
         cpsSlider.setOpaque(false);
         cpsControlPanel.add(cpsSlider, BorderLayout.CENTER);
 
+        // Panel for spinner on the right
+        JPanel spinnerPanel = new JPanel(new BorderLayout());
+        spinnerPanel.setOpaque(false);
+
         SpinnerNumberModel spinnerModel = new SpinnerNumberModel(
                 settingsManager.getCPS(), SPINNER_MIN_CPS, SPINNER_MAX_CPS, SPINNER_STEP_CPS);
         cpsSpinner = new JSpinner(spinnerModel);
+        cpsSpinner.setBackground(themeManager.getColor("background"));
+
         styleSpinner(cpsSpinner);
-        cpsControlPanel.add(cpsSpinner, BorderLayout.EAST);
+        spinnerPanel.add(cpsSpinner, BorderLayout.CENTER);
+        cpsControlPanel.add(spinnerPanel, BorderLayout.EAST);
 
         card.add(cpsControlPanel, BorderLayout.CENTER);
+
+        // Description label
+        JLabel descriptionLabel = new JLabel("<html><p>Adjust how many clicks per second the auto-clicker will perform.</p></html>");
+        descriptionLabel.setBorder(new EmptyBorder(5, 10, 5, 10));
+        card.add(descriptionLabel, BorderLayout.SOUTH);
 
         // Sync listeners
         cpsSlider.addChangeListener(e -> {
@@ -212,6 +263,50 @@ public class ControlPanel extends JPanel {
         return card;
     }
 
+    /**
+     * Sets up synchronized behavior between CPS slider and spinner.
+     */
+    private void setupCpsControls() {
+        // Update spinner when slider changes
+        cpsSlider.addChangeListener(e -> {
+            if (!cpsSlider.getValueIsAdjusting()) {
+                double sliderValue = cpsSlider.getValue();
+                if (sliderValue >= SPINNER_MIN_CPS && sliderValue <= SPINNER_MAX_CPS) {
+                    if (Math.abs((Double) cpsSpinner.getValue() - sliderValue) > SPINNER_STEP_CPS / 2) {
+                        cpsSpinner.setValue(sliderValue);
+                    }
+                }
+                settingsManager.setCPS(sliderValue);
+                updateStatusIfNeeded();
+            }
+        });
+
+        // Update slider when spinner changes
+        cpsSpinner.addChangeListener(e -> {
+            double spinnerValue = (double) cpsSpinner.getValue();
+            settingsManager.setCPS(spinnerValue);
+            if (spinnerValue >= SLIDER_MIN_CPS && spinnerValue <= SLIDER_MAX_CPS) {
+                if (cpsSlider.getValue() != (int) Math.round(spinnerValue)) {
+                    cpsSlider.setValue((int) Math.round(spinnerValue));
+                }
+            }
+            updateStatusIfNeeded();
+        });
+    }
+
+    /**
+     * Updates the status display in the parent frame if the auto-clicker is not running.
+     */
+    private void updateStatusIfNeeded() {
+        // Update status bar if clicking is stopped
+        if (parentFrame != null && clickerService != null && !clickerService.isRunning()) {
+            parentFrame.updateStatusDisplay();
+        }
+    }
+
+    /**
+     * Creates the card for click options (mode and button).
+     */
     private JPanel createClickOptionsCard() {
         JPanel card = createCardPanel();
         card.setLayout(new GridBagLayout());
@@ -228,64 +323,80 @@ public class ControlPanel extends JPanel {
 
         // Click Mode
         JLabel clickModeLabel = new JLabel("Click Mode:");
+        clickModeLabel.setFont(themeManager.getFont("body_regular"));
+        clickModeLabel.setForeground(themeManager.getColor("text_primary"));
         card.add(clickModeLabel, gbc);
+
+        // Create click mode combo box
         clickModeComboBox = new JComboBox<>(new String[]{"SINGLE", "DOUBLE", "TRIPLE"});
         clickModeComboBox.setSelectedItem(settingsManager.getClickMode());
-        clickModeComboBox.addActionListener(e -> settingsManager.setClickMode((String) clickModeComboBox.getSelectedItem()));
         styleComboBox(clickModeComboBox);
+        clickModeComboBox.addActionListener(e -> settingsManager.setClickMode((String) clickModeComboBox.getSelectedItem()));
         card.add(clickModeComboBox, gbcControl);
 
         // Mouse Button
         gbc.gridy++; gbcControl.gridy++;
         JLabel mouseButtonLabel = new JLabel("Mouse Button:");
+        mouseButtonLabel.setFont(themeManager.getFont("body_regular"));
+        mouseButtonLabel.setForeground(themeManager.getColor("text_primary"));
         card.add(mouseButtonLabel, gbc);
+
+        // Create mouse button combo box
         mouseButtonComboBox = new JComboBox<>(new String[]{"LEFT", "MIDDLE", "RIGHT"});
         mouseButtonComboBox.setSelectedItem(settingsManager.getMouseButton());
-        mouseButtonComboBox.addActionListener(e -> settingsManager.setMouseButton((String) mouseButtonComboBox.getSelectedItem()));
         styleComboBox(mouseButtonComboBox);
+        mouseButtonComboBox.addActionListener(e -> settingsManager.setMouseButton((String) mouseButtonComboBox.getSelectedItem()));
         card.add(mouseButtonComboBox, gbcControl);
 
         return card;
     }
 
+    /**
+     * Creates a recommendation card for macOS users.
+     */
     private JPanel createMacOsRecommendationCard() {
         JPanel card = createInfoCard("macOS Recommendation");
-        JLabel noteText = new JLabel("<html><p style='width:95%'>For macOS, a CPS value between <b>5-15</b> works most reliably and helps prevent cursor locking issues when using native events.</p></html>");
-        noteText.setFont(SMALL_ITALIC_FONT);
+        JLabel noteText = new JLabel(
+                "<html><p style='width:95%'>For macOS, a CPS value between <b>5-15</b> works most reliably " +
+                        "and helps prevent cursor locking issues when using native events.</p></html>");
+        noteText.setFont(themeManager.getFont("small_regular"));
+        noteText.setForeground(themeManager.getColor("warning"));
         card.add(noteText, BorderLayout.CENTER);
         return card;
     }
 
-    // --- Humanization Panel ---
+    /**
+     * Creates the humanization panel with randomization options.
+     */
     private JPanel createHumanizationPanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-
-        // Default Constraints
-        gbc.gridx = 0; gbc.gridwidth = 1; gbc.weightx = 1.0;
-        gbc.fill = GridBagConstraints.HORIZONTAL; gbc.anchor = GridBagConstraints.NORTHWEST;
-        gbc.insets = new Insets(0, 0, VERTICAL_GAP, 0);
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setOpaque(false);
 
         // Click Timing Section
-        gbc.gridy = 0; panel.add(createSectionHeader("Click Timing Randomization"), gbc);
-        gbc.gridy++; panel.add(createRandomizeIntervalCard(), gbc);
+        panel.add(createSectionHeader("Click Timing Randomization"));
+        panel.add(createRandomizeIntervalCard());
+        panel.add(Box.createVerticalStrut(VERTICAL_GAP));
 
         // Mouse Behavior Section
-        gbc.gridy++; panel.add(createSectionHeader("Mouse Behavior"), gbc);
-        gbc.gridy++; panel.add(createMouseMovementCard(), gbc);
+        panel.add(createSectionHeader("Mouse Behavior"));
+        panel.add(createMouseMovementCard());
 
         // macOS Warning
         if (PlatformDetector.isMacOS()) {
-            gbc.gridy++; panel.add(createMacOsWarningCard(), gbc);
+            panel.add(Box.createVerticalStrut(VERTICAL_GAP));
+            panel.add(createMacOsWarningCard());
         }
 
-        // Vertical Glue
-        gbc.gridy++; gbc.weighty = 1.0; gbc.fill = GridBagConstraints.BOTH;
-        panel.add(Box.createVerticalGlue(), gbc);
+        // Add flexible spacer at bottom
+        panel.add(Box.createVerticalGlue());
 
         return panel;
     }
 
+    /**
+     * Creates the card for interval randomization controls.
+     */
     private JPanel createRandomizeIntervalCard() {
         JPanel card = createCardPanel();
         card.setLayout(new BorderLayout(HORIZONTAL_GAP, VERTICAL_GAP / 2));
@@ -295,13 +406,16 @@ public class ControlPanel extends JPanel {
         checkboxPanel.setOpaque(false);
 
         randomizeIntervalCheckBox = new JCheckBox("Randomize Click Interval");
-        configureCheckBox(randomizeIntervalCheckBox, CARD_TITLE_FONT);
+        randomizeIntervalCheckBox.setFont(themeManager.getFont("heading_small"));
+        randomizeIntervalCheckBox.setForeground(themeManager.getColor("text_primary"));
+        randomizeIntervalCheckBox.setOpaque(false);
         randomizeIntervalCheckBox.setSelected(settingsManager.isRandomizeInterval());
+        UIUtils.styleCheckBox(randomizeIntervalCheckBox, themeManager.getColor("text_primary"));
         checkboxPanel.add(randomizeIntervalCheckBox);
 
         card.add(checkboxPanel, BorderLayout.NORTH);
 
-        // Panel for the slider and labels using BorderLayout
+        // Panel for the slider and labels
         JPanel randomizationFactorPanel = new JPanel(new BorderLayout(HORIZONTAL_GAP, 0));
         randomizationFactorPanel.setOpaque(false);
         randomizationFactorPanel.setBorder(new EmptyBorder(8, 5, 5, 5));
@@ -309,28 +423,47 @@ public class ControlPanel extends JPanel {
         // Fixed-width label for "Intensity:"
         JLabel intensityLabel = new JLabel("Intensity:");
         intensityLabel.setPreferredSize(new Dimension(70, intensityLabel.getPreferredSize().height));
+        intensityLabel.setFont(themeManager.getFont("body_regular"));
+        intensityLabel.setForeground(themeManager.getColor("text_secondary"));
+        intensityLabel.setEnabled(settingsManager.isRandomizeInterval());
         randomizationFactorPanel.add(intensityLabel, BorderLayout.WEST);
 
+        // Slider for randomization factor
         randomizationFactorSlider = new JSlider(0, 100, (int) (settingsManager.getRandomizationFactor() * 100));
         randomizationFactorSlider.setOpaque(false);
         randomizationFactorSlider.setEnabled(settingsManager.isRandomizeInterval());
         randomizationFactorPanel.add(randomizationFactorSlider, BorderLayout.CENTER);
 
+        // Label showing randomization percentage
         randomizationValueLabel = new JLabel(String.format("%.0f%%", settingsManager.getRandomizationFactor() * 100));
         randomizationValueLabel.setPreferredSize(new Dimension(50, randomizationValueLabel.getPreferredSize().height));
         randomizationValueLabel.setHorizontalAlignment(SwingConstants.RIGHT);
+        randomizationValueLabel.setFont(themeManager.getFont("body_regular"));
+        randomizationValueLabel.setForeground(themeManager.getColor("text_secondary"));
         randomizationValueLabel.setEnabled(settingsManager.isRandomizeInterval());
         randomizationFactorPanel.add(randomizationValueLabel, BorderLayout.EAST);
 
         card.add(randomizationFactorPanel, BorderLayout.CENTER);
 
         // Description label
-        JLabel descriptionLabel = new JLabel("<html><p>Adds randomness to click timing for more natural behavior.</p></html>");
-        descriptionLabel.setFont(SMALL_ITALIC_FONT);
+        JLabel descriptionLabel = new JLabel(
+                "<html><p>Adds randomness to click timing for more natural behavior.</p></html>");
+        descriptionLabel.setFont(themeManager.getFont("small_regular"));
+        descriptionLabel.setForeground(themeManager.getColor("text_secondary"));
         descriptionLabel.setBorder(new EmptyBorder(5, 10, 5, 10));
         card.add(descriptionLabel, BorderLayout.SOUTH);
 
-        // Listeners
+        // Set up listeners
+        setupRandomizationControls();
+
+        return card;
+    }
+
+    /**
+     * Sets up listeners for randomization controls.
+     */
+    private void setupRandomizationControls() {
+        // Update label when slider changes
         randomizationFactorSlider.addChangeListener(e -> {
             double value = randomizationFactorSlider.getValue() / 100.0;
             randomizationValueLabel.setText(String.format("%.0f%%", value * 100));
@@ -339,17 +472,29 @@ public class ControlPanel extends JPanel {
             }
         });
 
+        // Enable/disable controls when checkbox changes
         randomizeIntervalCheckBox.addActionListener(e -> {
             boolean selected = randomizeIntervalCheckBox.isSelected();
             settingsManager.setRandomizeInterval(selected);
             randomizationFactorSlider.setEnabled(selected);
             randomizationValueLabel.setEnabled(selected);
-            intensityLabel.setEnabled(selected);
-        });
 
-        return card;
+            // Find the intensity label
+            Component parent = randomizationFactorSlider.getParent();
+            if (parent instanceof Container) {
+                for (Component c : ((Container) parent).getComponents()) {
+                    if (c instanceof JLabel && ((JLabel) c).getText().equals("Intensity:")) {
+                        c.setEnabled(selected);
+                        break;
+                    }
+                }
+            }
+        });
     }
 
+    /**
+     * Creates the card for mouse movement controls.
+     */
     private JPanel createMouseMovementCard() {
         JPanel card = createCardPanel();
         card.setLayout(new BorderLayout(HORIZONTAL_GAP, VERTICAL_GAP / 2));
@@ -359,8 +504,11 @@ public class ControlPanel extends JPanel {
         checkboxPanel.setOpaque(false);
 
         randomMovementCheckBox = new JCheckBox("Add Slight Mouse Movement");
-        configureCheckBox(randomMovementCheckBox, CARD_TITLE_FONT);
+        randomMovementCheckBox.setFont(themeManager.getFont("heading_small"));
+        randomMovementCheckBox.setForeground(themeManager.getColor("text_primary"));
+        randomMovementCheckBox.setOpaque(false);
         randomMovementCheckBox.setSelected(settingsManager.isRandomMovement());
+        UIUtils.styleCheckBox(randomMovementCheckBox, themeManager.getColor("text_primary"));
         checkboxPanel.add(randomMovementCheckBox);
 
         card.add(checkboxPanel, BorderLayout.NORTH);
@@ -373,22 +521,33 @@ public class ControlPanel extends JPanel {
         // Fixed-width label
         JLabel radiusLabel = new JLabel("Max Radius (pixels):");
         radiusLabel.setPreferredSize(new Dimension(140, radiusLabel.getPreferredSize().height));
-        radiusLabel.setEnabled(randomMovementCheckBox.isSelected());
+        radiusLabel.setFont(themeManager.getFont("body_regular"));
+        radiusLabel.setForeground(themeManager.getColor("text_secondary"));
+        radiusLabel.setEnabled(settingsManager.isRandomMovement());
         movementRadiusPanel.add(radiusLabel, BorderLayout.WEST);
 
         // Wrapper panel to prevent spinner from filling the entire space
         JPanel spinnerWrapper = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         spinnerWrapper.setOpaque(false);
 
+        // Create spinner for radius value
         SpinnerNumberModel movementRadiusModel = new SpinnerNumberModel(
                 settingsManager.getMovementRadius(), 1, 20, 1);
         movementRadiusSpinner = new JSpinner(movementRadiusModel);
         movementRadiusSpinner.setEnabled(settingsManager.isRandomMovement());
+
+        // Apply our custom spinner styling
         styleSpinner(movementRadiusSpinner);
+
+        // Set fixed width for better appearance
+        Dimension preferredSize = new Dimension(60, movementRadiusSpinner.getPreferredSize().height);
+        movementRadiusSpinner.setPreferredSize(preferredSize);
+
+        // Set width for spinner
         JComponent editor = movementRadiusSpinner.getEditor();
         if (editor instanceof JSpinner.DefaultEditor) {
             JFormattedTextField tf = ((JSpinner.DefaultEditor) editor).getTextField();
-            tf.setColumns(3); // Limit the width
+            tf.setColumns(3);
         }
 
         spinnerWrapper.add(movementRadiusSpinner);
@@ -397,57 +556,92 @@ public class ControlPanel extends JPanel {
         card.add(movementRadiusPanel, BorderLayout.CENTER);
 
         // Description
-        JLabel descriptionLabel = new JLabel("<html><p>Adds small, random mouse offsets before each click. Helps avoid detection in some applications.</p></html>");
-        descriptionLabel.setFont(SMALL_ITALIC_FONT);
+        JLabel descriptionLabel = new JLabel(
+                "<html><p>Adds small, random mouse offsets before each click. " +
+                        "Helps avoid detection in some applications.</p></html>");
+        descriptionLabel.setFont(themeManager.getFont("small_regular"));
+        descriptionLabel.setForeground(themeManager.getColor("text_secondary"));
         descriptionLabel.setBorder(new EmptyBorder(5, 10, 5, 10));
         card.add(descriptionLabel, BorderLayout.SOUTH);
 
+        // Set up listeners
+        setupMouseMovementControls();
+
+        return card;
+    }
+
+    /**
+     * Sets up listeners for mouse movement controls.
+     */
+    private void setupMouseMovementControls() {
+        // Enable/disable controls when checkbox changes
         randomMovementCheckBox.addActionListener(e -> {
             boolean selected = randomMovementCheckBox.isSelected();
             settingsManager.setRandomMovement(selected);
             movementRadiusSpinner.setEnabled(selected);
-            radiusLabel.setEnabled(selected);
+
+            // Find the radius label
+            Container parent = movementRadiusSpinner.getParent();
+            while (parent != null && !(parent instanceof JPanel && parent.getLayout() instanceof BorderLayout)) {
+                parent = parent.getParent();
+            }
+
+            if (parent != null) {
+                for (Component c : ((Container) parent).getComponents()) {
+                    if (c instanceof JLabel && ((JLabel) c).getText().equals("Max Radius (pixels):")) {
+                        c.setEnabled(selected);
+                        break;
+                    }
+                }
+            }
         });
 
-        movementRadiusSpinner.addChangeListener(e -> settingsManager.setMovementRadius((int) movementRadiusSpinner.getValue()));
-
-        return card;
+        // Update settings when spinner changes
+        movementRadiusSpinner.addChangeListener(e ->
+                settingsManager.setMovementRadius((int) movementRadiusSpinner.getValue()));
     }
 
+    /**
+     * Creates a warning card for macOS users.
+     */
     private JPanel createMacOsWarningCard() {
         JPanel card = createInfoCard("macOS Compatibility Note");
-        JLabel warningText = new JLabel("<html><p style='width:95%'>On macOS, the 'Slight Mouse Movement' feature might occasionally interfere with native event posting, potentially causing minor cursor jumps. If issues arise, disable this feature.</p></html>");
-        warningText.setFont(SMALL_ITALIC_FONT);
+        JLabel warningText = new JLabel(
+                "<html><p style='width:95%'>On macOS, the 'Slight Mouse Movement' feature might occasionally " +
+                        "interfere with native event posting, potentially causing minor cursor jumps. " +
+                        "If issues arise, disable this feature.</p></html>");
+        warningText.setFont(themeManager.getFont("small_regular"));
+        warningText.setForeground(themeManager.getColor("warning"));
         card.add(warningText, BorderLayout.CENTER);
         return card;
     }
 
-    // --- Hotkeys Panel (Updated) ---
+    /**
+     * Creates the hotkeys panel with global hotkey settings.
+     */
     private JPanel createHotkeysPanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-
-        // Default Constraints
-        gbc.gridx = 0; gbc.gridwidth = 1; gbc.weightx = 1.0;
-        gbc.fill = GridBagConstraints.HORIZONTAL; gbc.anchor = GridBagConstraints.NORTHWEST;
-        gbc.insets = new Insets(0, 0, VERTICAL_GAP, 0);
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setOpaque(false);
 
         // Global Hotkeys Section
-        gbc.gridy = 0; panel.add(createSectionHeader("Global Hotkeys"), gbc);
-        gbc.gridy++; panel.add(createHotkeysCard(), gbc); // Updated card method
+        panel.add(createSectionHeader("Global Hotkeys"));
+        panel.add(createHotkeysCard());
+        panel.add(Box.createVerticalStrut(VERTICAL_GAP));
 
         // Information Section
-        gbc.gridy++; panel.add(createSectionHeader("Information"), gbc);
-        gbc.gridy++; panel.add(createHotkeyInfoCard(), gbc);
+        panel.add(createSectionHeader("Information"));
+        panel.add(createHotkeyInfoCard());
 
-        // Vertical Glue
-        gbc.gridy++; gbc.weighty = 1.0; gbc.fill = GridBagConstraints.BOTH;
-        panel.add(Box.createVerticalGlue(), gbc);
+        // Add flexible spacer at bottom
+        panel.add(Box.createVerticalGlue());
 
         return panel;
     }
 
-    /** Creates the card containing all hotkey configuration options. */
+    /**
+     * Creates the card containing all hotkey configuration options.
+     */
     private JPanel createHotkeysCard() {
         JPanel card = createCardPanel();
         card.setLayout(new GridBagLayout());
@@ -468,55 +662,106 @@ public class ControlPanel extends JPanel {
 
         // Toggle Hotkey
         JLabel toggleLabel = new JLabel("Start/Stop Hotkey:");
+        toggleLabel.setFont(themeManager.getFont("body_regular"));
+        toggleLabel.setForeground(themeManager.getColor("text_primary"));
         card.add(toggleLabel, gbc);
-        toggleHotkeyComboBox = createHotkeyComboBox(settingsManager.getToggleHotkey(), settingsManager::setToggleHotkey);
+
+        toggleHotkeyComboBox = createHotkeyComboBox(settingsManager.getToggleHotkey(),
+                key -> settingsManager.setToggleHotkey(key));
         card.add(toggleHotkeyComboBox, gbcControl);
 
         // Visibility Hotkey
         gbc.gridy++; gbcControl.gridy++;
         JLabel visibilityLabel = new JLabel("Show/Hide Hotkey:");
+        visibilityLabel.setFont(themeManager.getFont("body_regular"));
+        visibilityLabel.setForeground(themeManager.getColor("text_primary"));
         card.add(visibilityLabel, gbc);
-        visibilityHotkeyComboBox = createHotkeyComboBox(settingsManager.getVisibilityHotkey(), settingsManager::setVisibilityHotkey);
+
+        visibilityHotkeyComboBox = createHotkeyComboBox(settingsManager.getVisibilityHotkey(),
+                key -> settingsManager.setVisibilityHotkey(key));
         card.add(visibilityHotkeyComboBox, gbcControl);
 
         // Pause/Resume Hotkey
         gbc.gridy++; gbcControl.gridy++;
         JLabel pauseLabel = new JLabel("Pause/Resume Hotkey:");
+        pauseLabel.setFont(themeManager.getFont("body_regular"));
+        pauseLabel.setForeground(themeManager.getColor("text_primary"));
         card.add(pauseLabel, gbc);
-        pauseHotkeyComboBox = createHotkeyComboBox(settingsManager.getPauseHotkey(), settingsManager::setPauseHotkey);
+
+        pauseHotkeyComboBox = createHotkeyComboBox(settingsManager.getPauseHotkey(),
+                key -> settingsManager.setPauseHotkey(key));
         card.add(pauseHotkeyComboBox, gbcControl);
 
         // Increase Speed Hotkey
         gbc.gridy++; gbcControl.gridy++;
         JLabel increaseSpeedLabel = new JLabel("Increase Speed Hotkey:");
+        increaseSpeedLabel.setFont(themeManager.getFont("body_regular"));
+        increaseSpeedLabel.setForeground(themeManager.getColor("text_primary"));
         card.add(increaseSpeedLabel, gbc);
-        increaseSpeedHotkeyComboBox = createHotkeyComboBox(settingsManager.getIncreaseSpeedHotkey(), settingsManager::setIncreaseSpeedHotkey);
+
+        increaseSpeedHotkeyComboBox = createHotkeyComboBox(settingsManager.getIncreaseSpeedHotkey(),
+                key -> settingsManager.setIncreaseSpeedHotkey(key));
         card.add(increaseSpeedHotkeyComboBox, gbcControl);
 
         // Decrease Speed Hotkey
         gbc.gridy++; gbcControl.gridy++;
         JLabel decreaseSpeedLabel = new JLabel("Decrease Speed Hotkey:");
+        decreaseSpeedLabel.setFont(themeManager.getFont("body_regular"));
+        decreaseSpeedLabel.setForeground(themeManager.getColor("text_primary"));
         card.add(decreaseSpeedLabel, gbc);
-        decreaseSpeedHotkeyComboBox = createHotkeyComboBox(settingsManager.getDecreaseSpeedHotkey(), settingsManager::setDecreaseSpeedHotkey);
+
+        decreaseSpeedHotkeyComboBox = createHotkeyComboBox(settingsManager.getDecreaseSpeedHotkey(),
+                key -> settingsManager.setDecreaseSpeedHotkey(key));
         card.add(decreaseSpeedHotkeyComboBox, gbcControl);
 
         return card;
     }
 
-    /** Helper method to create and configure a hotkey combo box. */
+    /**
+     * Helper method to create and configure a hotkey combo box.
+     */
     private JComboBox<String> createHotkeyComboBox(String initialValue, java.util.function.Consumer<String> saveAction) {
-        JComboBox<String> comboBox = new JComboBox<>(parentFrame.getKeybindManager().getAvailableKeyNames());
-        comboBox.setSelectedItem(initialValue);
+        // Create the combo box
+        JComboBox<String> comboBox = new JComboBox<>();
+
+        // Delay populating items until the component is fully initialized
+        SwingUtilities.invokeLater(() -> {
+            if (parentFrame != null && parentFrame.getKeybindManager() != null) {
+                String[] items = parentFrame.getKeybindManager().getAvailableKeyNames();
+                if (items != null && items.length > 0) {
+                    DefaultComboBoxModel<String> model = new DefaultComboBoxModel<>(items);
+                    comboBox.setModel(model);
+
+                    // Select initial value if valid
+                    if (initialValue != null && comboBox.getItemCount() > 0) {
+                        comboBox.setSelectedItem(initialValue);
+                    }
+                }
+            }
+        });
+
+        // Style the combo box
+        styleComboBox(comboBox);
+
+        // Add action listener
         comboBox.addActionListener(e -> {
             String selectedHotkey = (String) comboBox.getSelectedItem();
-            saveAction.accept(selectedHotkey); // Use the provided Consumer to save the setting
+            if (selectedHotkey != null) {
+                saveAction.accept(selectedHotkey);
 
+                // Refresh keybind registrations if applicable
+                if (parentFrame != null && parentFrame.getKeybindManager() != null) {
+                    parentFrame.refreshKeybinds();
+                }
+            }
         });
-        styleComboBox(comboBox); // Apply theme styling
+
         return comboBox;
     }
 
-
+    /**
+     * Creates an information card for hotkey usage.
+     */
     private JPanel createHotkeyInfoCard() {
         JPanel card = createInfoCard("Hotkey Information");
 
@@ -527,37 +772,41 @@ public class ControlPanel extends JPanel {
                 "<li>Speed adjustment hotkeys change CPS by 1.0 per press.</li>" +
                 "</ul></html>";
         JLabel infoText = new JLabel(infoHTML);
-        infoText.setFont(DEFAULT_FONT);
+        infoText.setFont(themeManager.getFont("body_regular"));
+        infoText.setForeground(themeManager.getColor("text_primary"));
         card.add(infoText, BorderLayout.CENTER);
+
         return card;
     }
 
-    // --- Appearance Panel ---
+    /**
+     * Creates the appearance panel with window and theme settings.
+     */
     private JPanel createAppearancePanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-
-        // Default Constraints
-        gbc.gridx = 0; gbc.gridwidth = 1; gbc.weightx = 1.0;
-        gbc.fill = GridBagConstraints.HORIZONTAL; gbc.anchor = GridBagConstraints.NORTHWEST;
-        gbc.insets = new Insets(0, 0, VERTICAL_GAP, 0);
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setOpaque(false);
 
         // Window Settings Section
-        gbc.gridy = 0; panel.add(createSectionHeader("Window Behavior"), gbc);
-        gbc.gridy++; panel.add(createWindowOptionsCard(), gbc);
+        panel.add(createSectionHeader("Window Behavior"));
+        panel.add(createWindowOptionsCard());
+        panel.add(Box.createVerticalStrut(VERTICAL_GAP));
 
         // Appearance Section
-        gbc.gridy++; panel.add(createSectionHeader("Visuals"), gbc);
-        gbc.gridy++; panel.add(createTransparencyCard(), gbc);
-        gbc.gridy++; panel.add(createThemeToggleCard(), gbc);
+        panel.add(createSectionHeader("Visuals"));
+        panel.add(createTransparencyCard());
+        panel.add(Box.createVerticalStrut(VERTICAL_GAP));
+        panel.add(createThemeToggleCard());
 
-        // Vertical Glue
-        gbc.gridy++; gbc.weighty = 1.0; gbc.fill = GridBagConstraints.BOTH;
-        panel.add(Box.createVerticalGlue(), gbc);
+        // Add flexible spacer at bottom
+        panel.add(Box.createVerticalGlue());
 
         return panel;
     }
 
+    /**
+     * Creates the card with window behavior options.
+     */
     private JPanel createWindowOptionsCard() {
         JPanel card = createCardPanel();
         card.setLayout(new GridBagLayout());
@@ -568,69 +817,94 @@ public class ControlPanel extends JPanel {
         gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1.0;
         gbc.insets = new Insets(0, 0, VERTICAL_GAP / 3, 0);
 
-        // Always On Top
+        // Always On Top checkbox
         alwaysOnTopCheckBox = new JCheckBox("Always On Top");
-        configureCheckBox(alwaysOnTopCheckBox, DEFAULT_FONT);
+        alwaysOnTopCheckBox.setFont(themeManager.getFont("body_regular"));
+        alwaysOnTopCheckBox.setForeground(themeManager.getColor("text_primary"));
+        alwaysOnTopCheckBox.setOpaque(false);
         alwaysOnTopCheckBox.setSelected(settingsManager.isAlwaysOnTop());
+        UIUtils.styleCheckBox(alwaysOnTopCheckBox, themeManager.getColor("text_primary"));
         alwaysOnTopCheckBox.addActionListener(e -> {
             boolean selected = alwaysOnTopCheckBox.isSelected();
             settingsManager.setAlwaysOnTop(selected);
-            if (parentFrame != null) parentFrame.setAlwaysOnTop(selected);
+            if (parentFrame != null) {
+                parentFrame.setAlwaysOnTop(selected);
+            }
         });
         card.add(alwaysOnTopCheckBox, gbc);
 
-        // Auto Hide
+        // Auto Hide checkbox
         gbc.gridy++;
         autoHideCheckBox = new JCheckBox("Auto-Hide Window (Show on Top Edge Hover)");
-        configureCheckBox(autoHideCheckBox, DEFAULT_FONT);
+        autoHideCheckBox.setFont(themeManager.getFont("body_regular"));
+        autoHideCheckBox.setForeground(themeManager.getColor("text_primary"));
+        autoHideCheckBox.setOpaque(false);
         autoHideCheckBox.setSelected(settingsManager.isAutoHide());
+        UIUtils.styleCheckBox(autoHideCheckBox, themeManager.getColor("text_primary"));
+        autoHideCheckBox.setToolTipText("Hides the window automatically; reappears when the mouse touches the top screen edge.");
         autoHideCheckBox.addActionListener(e -> {
             boolean selected = autoHideCheckBox.isSelected();
             settingsManager.setAutoHide(selected);
-            if (parentFrame != null) parentFrame.setAutoHide(selected);
+            if (parentFrame != null) {
+                parentFrame.setAutoHide(selected);
+            }
         });
-        autoHideCheckBox.setToolTipText("Hides the window automatically; reappears when the mouse touches the top screen edge.");
         card.add(autoHideCheckBox, gbc);
 
-        // Minimize to Tray
+        // Minimize to Tray checkbox
         gbc.gridy++;
         minimizeToTrayCheckBox = new JCheckBox("Minimize to System Tray");
-        configureCheckBox(minimizeToTrayCheckBox, DEFAULT_FONT);
+        minimizeToTrayCheckBox.setFont(themeManager.getFont("body_regular"));
+        minimizeToTrayCheckBox.setForeground(themeManager.getColor("text_primary"));
+        minimizeToTrayCheckBox.setOpaque(false);
         minimizeToTrayCheckBox.setSelected(settingsManager.isMinimizeToTray());
-        minimizeToTrayCheckBox.addActionListener(e -> settingsManager.setMinimizeToTray(minimizeToTrayCheckBox.isSelected()));
+        UIUtils.styleCheckBox(minimizeToTrayCheckBox, themeManager.getColor("text_primary"));
         minimizeToTrayCheckBox.setToolTipText("Requires System Tray support to be enabled in the application.");
+        minimizeToTrayCheckBox.addActionListener(e ->
+                settingsManager.setMinimizeToTray(minimizeToTrayCheckBox.isSelected()));
         card.add(minimizeToTrayCheckBox, gbc);
 
         return card;
     }
 
+    /**
+     * Creates the card for window transparency controls.
+     */
     private JPanel createTransparencyCard() {
         JPanel card = createCardPanel();
         card.setLayout(new BorderLayout(HORIZONTAL_GAP, 0));
 
         JLabel transparencyLabel = new JLabel("Window Transparency:");
-        transparencyLabel.setFont(CARD_TITLE_FONT);
+        transparencyLabel.setFont(themeManager.getFont("heading_small"));
+        transparencyLabel.setForeground(themeManager.getColor("text_primary"));
         card.add(transparencyLabel, BorderLayout.NORTH);
 
         JPanel sliderPanel = new JPanel(new BorderLayout(HORIZONTAL_GAP, 0));
         sliderPanel.setOpaque(false);
         sliderPanel.setBorder(new EmptyBorder(8, 0, 0, 0));
 
+        // Transparency slider
         transparencySlider = new JSlider(20, 100, (int) (settingsManager.getTransparency() * 100));
         transparencySlider.setOpaque(false);
         sliderPanel.add(transparencySlider, BorderLayout.CENTER);
 
+        // Value label
         transparencyValueLabel = new JLabel(String.format("%.0f%%", settingsManager.getTransparency() * 100));
         transparencyValueLabel.setPreferredSize(new Dimension(50, transparencyValueLabel.getPreferredSize().height));
         transparencyValueLabel.setHorizontalAlignment(SwingConstants.RIGHT);
+        transparencyValueLabel.setFont(themeManager.getFont("body_regular"));
+        transparencyValueLabel.setForeground(themeManager.getColor("text_secondary"));
         sliderPanel.add(transparencyValueLabel, BorderLayout.EAST);
 
+        // Set up listener for transparency slider
         transparencySlider.addChangeListener(e -> {
             double value = transparencySlider.getValue() / 100.0;
             transparencyValueLabel.setText(String.format("%.0f%%", value * 100));
             if (!transparencySlider.getValueIsAdjusting()) {
                 settingsManager.setTransparency(value);
-                if (parentFrame != null) parentFrame.setWindowTransparency(value);
+                if (parentFrame != null) {
+                    parentFrame.setWindowTransparency(value);
+                }
             }
         });
 
@@ -638,40 +912,63 @@ public class ControlPanel extends JPanel {
         return card;
     }
 
+    /**
+     * Creates the card with the theme toggle button.
+     */
     private JPanel createThemeToggleCard() {
         JPanel card = createCardPanel();
         card.setLayout(new FlowLayout(FlowLayout.CENTER));
 
-        toggleThemeButton = new JButton();
-        if (parentFrame != null) {
-            toggleThemeButton.setText(parentFrame.isDarkMode() ? "Switch to Light Theme" : "Switch to Dark Theme");
-        }
+        // Theme toggle button
+        toggleThemeButton = new JButton(parentFrame != null && parentFrame.isDarkMode()
+                ? "Switch to Light Theme" : "Switch to Dark Theme");
 
-        toggleThemeButton.setFont(BUTTON_FONT);
+        // Apply button styling
+        UIUtils.styleButton(toggleThemeButton,
+                themeManager.getColor("primary"),
+                parentFrame != null ? parentFrame.isDarkMode() : themeManager.isDarkMode());
+
+        // Add action listener
         toggleThemeButton.addActionListener(e -> {
-            if (parentFrame != null) parentFrame.toggleTheme();
+            if (parentFrame != null) {
+                parentFrame.toggleTheme();
+                toggleThemeButton.setText(parentFrame.isDarkMode() ?
+                        "Switch to Light Theme" : "Switch to Dark Theme");
+            }
         });
+
         card.add(toggleThemeButton);
         return card;
     }
 
-    // --- Control Button Panel ---
+    /**
+     * Creates the control button panel with start/stop buttons.
+     */
     private JPanel createControlButtonPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, HORIZONTAL_GAP * 2, 0));
         panel.setBorder(new EmptyBorder(VERTICAL_GAP, 0, VERTICAL_GAP, 0));
+        panel.setOpaque(false);
 
-        startButton = new JButton("Start Clicking");
-        startButton.setFont(BUTTON_FONT);
+        // Start button
+        startButton = UIUtils.createStyledButton("Start Clicking",
+                themeManager.getColor("success"),
+                themeManager.isDarkMode());
         startButton.addActionListener(e -> {
             clickerService.startClicking();
-            if (parentFrame != null) parentFrame.updateStatusDisplay();
+            if (parentFrame != null) {
+                parentFrame.updateStatusDisplay();
+            }
         });
 
-        stopButton = new JButton("Stop Clicking");
-        stopButton.setFont(BUTTON_FONT);
+        // Stop button
+        stopButton = UIUtils.createStyledButton("Stop Clicking",
+                themeManager.getColor("danger"),
+                themeManager.isDarkMode());
         stopButton.addActionListener(e -> {
             clickerService.stopClicking();
-            if (parentFrame != null) parentFrame.updateStatusDisplay();
+            if (parentFrame != null) {
+                parentFrame.updateStatusDisplay();
+            }
         });
 
         panel.add(startButton);
@@ -682,321 +979,227 @@ public class ControlPanel extends JPanel {
 
     // --- UI Helper Methods ---
 
+    /**
+     * Creates a section header label with consistent styling.
+     */
+    private JLabel createSectionHeader(String text) {
+        JLabel header = new JLabel(text);
+        header.setFont(themeManager.getFont("heading_medium"));
+        header.setForeground(themeManager.getColor("text_primary"));
+        header.setBorder(new EmptyBorder(SECTION_HEADER_PADDING, SECTION_HEADER_PADDING,
+                SECTION_HEADER_PADDING/2, SECTION_HEADER_PADDING));
+        header.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return header;
+    }
+
+    /**
+     * Creates a card panel with consistent styling.
+     */
     private JPanel createCardPanel() {
         JPanel card = new JPanel();
-        // Background and border set by applyThemeColors -> updateComponentColors
+
+        // Apply card styling
+        card.setBackground(themeManager.getColor("card"));
+
+        // Set border with padding
+        Border paddingBorder = new EmptyBorder(CARD_PADDING, CARD_PADDING, CARD_PADDING, CARD_PADDING);
+        Border lineBorder = BorderFactory.createLineBorder(themeManager.getColor("border"), 1);
+        card.setBorder(new CompoundBorder(lineBorder, paddingBorder));
+
+        // Set maximum width and alignment for consistent layout
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, card.getMaximumSize().height));
+        card.setAlignmentX(Component.LEFT_ALIGNMENT);
+
         return card;
     }
 
+    /**
+     * Creates an information card with a title.
+     */
     private JPanel createInfoCard(String title) {
         JPanel card = createCardPanel();
         card.setLayout(new BorderLayout(0, VERTICAL_GAP / 2));
+
         JLabel titleLabel = new JLabel(title);
-        titleLabel.setFont(CARD_TITLE_FONT);
-        titleLabel.setBorder(new EmptyBorder(0,0,5,0));
+        titleLabel.setFont(themeManager.getFont("heading_small"));
+        titleLabel.setForeground(themeManager.getColor("warning")); // Use warning color for attention
+        titleLabel.setBorder(new EmptyBorder(0, 0, 5, 0));
+
         card.add(titleLabel, BorderLayout.NORTH);
         return card;
     }
 
-    private JLabel createSectionHeader(String text) {
-        JLabel header = new JLabel(text);
-        header.setFont(SECTION_HEADER_FONT);
-        // Reduced vertical padding for section headers
-        header.setBorder(new EmptyBorder(new Insets(SECTION_HEADER_PADDING / 2, SECTION_HEADER_PADDING, SECTION_HEADER_PADDING / 2, SECTION_HEADER_PADDING)));
-        return header;
-    }
-
-    private void styleButton(JButton button, Color color) {
-        final Color finalColor = (color == null) ? (parentFrame != null ? parentFrame.getPrimaryColor() : Color.GRAY) : color;
-        button.setBackground(finalColor);
-        double luminance = (0.299 * finalColor.getRed() + 0.587 * finalColor.getGreen() + 0.114 * finalColor.getBlue()) / 255;
-        button.setForeground(luminance > 0.5 ? Color.BLACK : Color.WHITE);
-        button.setFont(BUTTON_FONT);
-        button.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 16));
-        button.setFocusPainted(false);
-        button.setOpaque(true);
-        button.setBorderPainted(false);
-        Color darkerColor = darken(finalColor, 0.1f);
-
-        // Remove old listeners to prevent duplicates
-        for (MouseListener ml : button.getMouseListeners()) {
-            if (ml instanceof MouseAdapter && ml.getClass().isAnonymousClass()) {
-                button.removeMouseListener(ml);
-            }
-        }
-
-        button.addMouseListener(new MouseAdapter() {
-            @Override public void mouseEntered(MouseEvent e) { button.setBackground(darkerColor); }
-            @Override public void mouseExited(MouseEvent e) { button.setBackground(finalColor); }
-        });
-    }
-
-    private void styleComboBox(JComboBox<String> comboBox) {
-        Color comboBg = Color.WHITE;
-        Color comboFg = Color.BLACK;
-        Color selectionBg = UIManager.getColor("ComboBox.selectionBackground");
-        Color selectionFg = UIManager.getColor("ComboBox.selectionForeground");
-        Color borderCol = Color.LIGHT_GRAY;
-        boolean isDark = false;
-
-        if (parentFrame != null) {
-            isDark = parentFrame.isDarkMode();
-            comboFg = parentFrame.getTextPrimaryColor();
-            comboBg = isDark ? new Color(60, 63, 65) : Color.WHITE; // Use specific dark color
-            borderCol = isDark ? parentFrame.getBorderColor() : Color.LIGHT_GRAY; // Use theme border or default
-            try { selectionBg = parentFrame.getSelectionBackgroundColor(); } catch (Exception e) { selectionBg = isDark ? parentFrame.getPrimaryColor().darker() : parentFrame.getPrimaryColor(); }
-            try { selectionFg = parentFrame.getSelectionForegroundColor(); } catch (Exception e) { selectionFg = isDark ? Color.WHITE : Color.WHITE; }
-        }
-        comboBox.setBackground(comboBg);
-        comboBox.setForeground(comboFg);
-        comboBox.setFont(DEFAULT_FONT);
-        comboBox.setBorder(BorderFactory.createLineBorder(borderCol));
-
-        Component editorComponent = comboBox.getEditor().getEditorComponent();
-        if (editorComponent instanceof JTextField) {
-            JTextField tfEditor = (JTextField) editorComponent;
-            tfEditor.setForeground(comboFg);
-            tfEditor.setBackground(comboBg);
-            tfEditor.setBorder(new EmptyBorder(2, 4, 2, 4));
-            tfEditor.setOpaque(true);
-        }
-
-        Color finalSelectionBg = selectionBg;
-        Color finalSelectionFg = selectionFg;
-        Color finalComboBg = comboBg;
-        Color finalComboFg = comboFg;
-        comboBox.setRenderer(new DefaultListCellRenderer() {
-            @Override
-            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                Component c = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-
-                if (c instanceof JLabel) {
-                    JLabel label = (JLabel) c;
-                    label.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
-
-                    if (isSelected) {
-                        label.setBackground(finalSelectionBg);
-                        label.setForeground(finalSelectionFg);
-                    } else {
-                        label.setBackground(finalComboBg);
-                        label.setForeground(finalComboFg);
-                    }
-                }
-
-                return c;
-            }
-        });
-    }
-
+    /**
+     * Applies consistent styling to a spinner.
+     */
     private void styleSpinner(JSpinner spinner) {
+        // Get proper theme colors
+        Color bg = themeManager.getColor("card");
+        Color fg = themeManager.getColor("text_primary");
+        Color borderColor = themeManager.getColor("border");
+
+        // Style the spinner and its text field
+        UIUtils.styleSpinner(spinner, bg, fg, borderColor);
+
+        // Ensure the text field has proper colors
         JComponent editor = spinner.getEditor();
         if (editor instanceof JSpinner.DefaultEditor) {
             JFormattedTextField textField = ((JSpinner.DefaultEditor) editor).getTextField();
-            textField.setFont(DEFAULT_FONT);
-            textField.setColumns(4);
-
-            Color spinnerFg = Color.BLACK;
-            Color spinnerBg = Color.WHITE;
-            Color borderCol = Color.LIGHT_GRAY;
-            boolean isDark = false;
-
-            if (parentFrame != null) {
-                isDark = parentFrame.isDarkMode();
-                spinnerFg = parentFrame.getTextPrimaryColor();
-                spinnerBg = isDark ? Color.DARK_GRAY : Color.WHITE;
-                borderCol = isDark ? parentFrame.getBorderColor() : Color.LIGHT_GRAY;
-            }
-            textField.setForeground(spinnerFg);
-            textField.setBackground(spinnerBg);
-            textField.setBorder(BorderFactory.createLineBorder(borderCol));
-            textField.setOpaque(true);
+            textField.setBackground(bg);
+            textField.setForeground(fg);
+            textField.setBorder(BorderFactory.createLineBorder(borderColor));
         }
     }
 
-    private void configureCheckBox(JCheckBox checkBox, Font font) {
-        checkBox.setFont(font);
-        if (parentFrame != null) {
-            checkBox.setForeground(parentFrame.getTextPrimaryColor());
-        } else {
-            checkBox.setForeground(Color.BLACK);
-        }
-        checkBox.setOpaque(false);
+    /**
+     * Applies consistent styling to a combo box.
+     */
+    private void styleComboBox(JComboBox<String> comboBox) {
+        UIUtils.styleComboBox(comboBox,
+                themeManager.getColor("input_background"),
+                themeManager.getColor("text_primary"),
+                themeManager.getColor("border"),
+                themeManager.getColor("selection_background"),
+                themeManager.getColor("selection_foreground"));
     }
 
-    private Color darken(Color color, float fraction) {
-        if (color == null) return Color.DARK_GRAY;
-        int r = Math.round(Math.max(0, color.getRed() * (1.0f - fraction)));
-        int g = Math.round(Math.max(0, color.getGreen() * (1.0f - fraction)));
-        int b = Math.round(Math.max(0, color.getBlue() * (1.0f - fraction)));
-        return new Color(r, g, b);
-    }
-
-    private Color lighten(Color color, float factor) {
-        if (color == null) return Color.LIGHT_GRAY;
-        int r = color.getRed();
-        int g = color.getGreen();
-        int b = color.getBlue();
-
-        r = Math.min(255, r + Math.round((255 - r) * factor));
-        g = Math.min(255, g + Math.round((255 - g) * factor));
-        b = Math.min(255, b + Math.round((255 - b) * factor));
-
-        return new Color(r, g, b, color.getAlpha());
-    }
-
-    // --- Theme Application ---
+    /**
+     * Applies theme colors to all components.
+     */
     public void applyThemeColors() {
-        if (parentFrame == null) {
-            System.err.println("Error: parentFrame is null in applyThemeColors(). Cannot apply theme.");
-            return;
+        // Set background for the main panel
+        setBackground(themeManager.getColor("background"));
+
+        // Update all components with the current theme
+        updateComponentTheme(this);
+
+        // Refresh button styling
+        if (startButton != null) {
+            UIUtils.styleButton(startButton, themeManager.getColor("success"),
+                    themeManager.isDarkMode());
         }
 
-        setBackground(parentFrame.getBackgroundColor()); // Set background for ControlPanel itself
-        // Update components recursively
-        updateComponentColors(this);
+        if (stopButton != null) {
+            UIUtils.styleButton(stopButton, themeManager.getColor("danger"),
+                    themeManager.isDarkMode());
+        }
 
-        // Explicitly update top-level styled components that might not be containers
         if (toggleThemeButton != null) {
-            toggleThemeButton.setText(parentFrame.isDarkMode() ? "Switch to Light Theme" : "Switch to Dark Theme");
-            styleButton(toggleThemeButton, parentFrame.getPrimaryColor());
+            toggleThemeButton.setText(parentFrame != null && parentFrame.isDarkMode()
+                    ? "Switch to Light Theme" : "Switch to Dark Theme");
+            UIUtils.styleButton(toggleThemeButton, themeManager.getColor("primary"),
+                    themeManager.isDarkMode());
         }
-        if(startButton != null) styleButton(startButton, parentFrame.getSuccessColor());
-        if(stopButton != null) styleButton(stopButton, parentFrame.getDangerColor());
 
+        // Ensure UI is refreshed
         revalidate();
         repaint();
     }
 
-    private void updateComponentColors(Container container) {
-        if (parentFrame == null) return;
+    /**
+     * Recursively updates theme colors for all components.
+     */
+    private void updateComponentTheme(Container container) {
+        // Get theme colors
+        Color bgColor = themeManager.getColor("background");
+        Color cardBgColor = themeManager.getColor("card");
+        Color borderColor = themeManager.getColor("border");
+        Color textPrimary = themeManager.getColor("text_primary");
+        Color textSecondary = themeManager.getColor("text_secondary");
 
-        boolean isDark = parentFrame.isDarkMode();
-        Color themeBg = parentFrame.getBackgroundColor();
-        Color cardBg = parentFrame.getCardBackgroundColor();
-        Color borderCol = parentFrame.getBorderColor();
-        Color textPrimary = parentFrame.getTextPrimaryColor();
-        Color textSecondary = parentFrame.getTextSecondaryColor();
-        Color warningColor = parentFrame.getWarningColor();
+        // Update each component in the container
+        for (Component comp : container.getComponents()) {
+            // Handle specific component types
+            if (comp instanceof JPanel) {
+                JPanel panel = (JPanel) comp;
 
-        for (Component component : container.getComponents()) {
-            if (component instanceof JLabel) {
-                JLabel label = (JLabel) component;
-                // Handle specific labels first
-                if (label == randomizationValueLabel || label == transparencyValueLabel) {
-                    label.setForeground(textSecondary);
-                } else if (label.getFont().equals(SECTION_HEADER_FONT) || label.getFont().equals(CARD_TITLE_FONT)) {
+                // Check if this looks like a card panel
+                if (panel.getBorder() instanceof CompoundBorder) {
+                    // Update card background and border
+                    panel.setBackground(cardBgColor);
+
+                    // Set border with updated colors
+                    Border paddingBorder = new EmptyBorder(CARD_PADDING, CARD_PADDING, CARD_PADDING, CARD_PADDING);
+                    Border lineBorder = BorderFactory.createLineBorder(borderColor, 1);
+                    panel.setBorder(new CompoundBorder(lineBorder, paddingBorder));
+                } else if (panel.isOpaque()) {
+                    // Update regular panel background
+                    panel.setBackground(bgColor);
+                }
+            } else if (comp instanceof JLabel) {
+                JLabel label = (JLabel) comp;
+
+                // Check if it's a section header
+                if (label.getFont().equals(themeManager.getFont("heading_medium")) ||
+                        label.getFont().equals(themeManager.getFont("heading_small"))) {
                     label.setForeground(textPrimary);
-                } else if (label.getForeground().equals(warningColor) || label.getForeground().equals(Color.ORANGE)){ // Check for warning color
-                    label.setForeground(warningColor);
-                } else { // General labels
-                    if (label.getFont().equals(SMALL_ITALIC_FONT) || label.getText().contains("<html>")) {
-                        label.setForeground(textSecondary); // Assume html or italic is secondary info
-                    } else {
-                        label.setForeground(textPrimary);
-                    }
+                } else if (label.getText() != null && label.getText().contains("<html>")) {
+                    // HTML content is usually description or info text
+                    label.setForeground(textSecondary);
+                } else if (comp == randomizationValueLabel || comp == transparencyValueLabel) {
+                    // Value labels use secondary text color
+                    label.setForeground(textSecondary);
+                } else {
+                    // Regular labels use primary text color
+                    label.setForeground(textPrimary);
                 }
-            } else if (component instanceof JCheckBox) {
-                configureCheckBox((JCheckBox)component, component.getFont()); // Re-apply checkbox styling
-            } else if (component instanceof JComboBox) {
-                styleComboBox((JComboBox<String>) component); // Re-apply combo box styling
-            } else if (component instanceof JSpinner) {
-                styleSpinner((JSpinner) component); // Re-apply spinner styling
-            } else if (component instanceof JPanel) {
-                JPanel panel = (JPanel) component;
-                // Check if it's likely a card panel we created
-                // Check if border is null before attempting to get its class
-                Border currentBorder = panel.getBorder();
-                boolean isCard = (currentBorder != null && currentBorder instanceof CompoundBorder) ||
-                        panel.getLayout() instanceof BorderLayout; // Heuristic check
-
-
-                if (isCard && panel.getParent() != null && !(panel.getParent() instanceof JScrollPane)) { // Avoid styling the main panel itself as a card
-                    panel.setBackground(cardBg);
-                    // Re-apply border based on theme
-                    Border paddingBorder = new EmptyBorder(CARD_INTERNAL_PADDING, CARD_INTERNAL_PADDING,
-                            CARD_INTERNAL_PADDING, CARD_INTERNAL_PADDING);
-                    Border lineBorder = BorderFactory.createLineBorder(borderCol, 1);
-                    Border outerBorder = BorderFactory.createCompoundBorder(lineBorder, paddingBorder);
-
-                    if (!isDark) {
-                        // Add shadow effect for light mode
-                        Border shadow = BorderFactory.createCompoundBorder(
-                                BorderFactory.createMatteBorder(0, 0, 1, 1, new Color(0,0,0, 30)),
-                                BorderFactory.createMatteBorder(0, 0, 1, 1, new Color(0,0,0, 15))
-                        );
-                        panel.setBorder(BorderFactory.createCompoundBorder(shadow, outerBorder));
-                    } else {
-                        panel.setBorder(outerBorder);
-                    }
-                } else if (panel.isOpaque() && panel != this && !(panel.getParent() instanceof JViewport)){
-                    // Style other opaque panels to match main background
-                    panel.setBackground(themeBg);
-                } else if (!panel.isOpaque()) {
-                    panel.setBackground(null); // Keep transparent panels transparent
-                }
-            } else if (component instanceof JSlider) {
-                JSlider slider = (JSlider) component;
-                boolean isEnabled = slider.isEnabled();
-                slider.setForeground(isEnabled ? textPrimary : textSecondary);
-                slider.setOpaque(false); // Ensure sliders are transparent
-            } else if (component instanceof JTabbedPane) {
-                JTabbedPane tabPane = (JTabbedPane) component;
-                tabPane.setBackground(themeBg);
-                tabPane.setForeground(textPrimary);
-                tabPane.setBorder(new EmptyBorder(10, 15, 5, 15));
-
-                // Style tab components
-                for (int i = 0; i < tabPane.getTabCount(); i++) {
-                    Component tab = tabPane.getTabComponentAt(i);
-                    if (tab == null) { // Create label if needed
-                        String title = tabPane.getTitleAt(i);
-                        JLabel tabLabel = new JLabel(title);
-                        tabLabel.setFont(DEFAULT_FONT);
-                        tabLabel.setForeground(textPrimary);
-                        tabLabel.setBorder(new EmptyBorder(5, 5, 5, 5));
-                        tabPane.setTabComponentAt(i, tabLabel);
-                    } else if (tab instanceof JLabel) { // Update existing label
-                        ((JLabel) tab).setForeground(textPrimary);
-                        ((JLabel) tab).setFont(DEFAULT_FONT);
-                    }
-                }
-            } else if (component instanceof JButton && component != startButton && component != stopButton && component != toggleThemeButton) {
-                JButton button = (JButton) component;
-                styleButton(button, parentFrame.getPrimaryColor());
-            } else if (component instanceof JScrollPane) {
-                JScrollPane scrollPane = (JScrollPane) component;
-                scrollPane.getViewport().setBackground(themeBg);
-                scrollPane.setBackground(themeBg);
-                // Style scroll bars if needed (more complex)
+            } else if (comp instanceof JCheckBox) {
+                JCheckBox checkBox = (JCheckBox) comp;
+                checkBox.setForeground(textPrimary);
+                UIUtils.styleCheckBox(checkBox, textPrimary);
+            } else if (comp instanceof JSlider) {
+                JSlider slider = (JSlider) comp;
+                slider.setOpaque(false);
+            } else if (comp instanceof JSpinner) {
+                // Use our custom spinner styling that properly sets colors
+                styleSpinner((JSpinner) comp);
+            } else if (comp instanceof JScrollPane) {
+                JScrollPane scrollPane = (JScrollPane) comp;
+                scrollPane.getViewport().setBackground(bgColor);
+                scrollPane.setBorder(BorderFactory.createEmptyBorder());
+            } else if (comp instanceof JTabbedPane) {
+                JTabbedPane tabbedPane = (JTabbedPane) comp;
+                themeManager.styleTabbedPane(tabbedPane);
             }
 
-            // Recurse into containers (skip already handled buttons)
-            if (component instanceof Container &&
-                    !(component instanceof JButton && (component == startButton || component == stopButton || component == toggleThemeButton))) {
-                updateComponentColors((Container) component);
+            // Recursively update child containers
+            if (comp instanceof Container && !(comp instanceof JButton)) {
+                updateComponentTheme((Container) comp);
             }
         }
     }
 
-    // --- Settings Loading (Updated) ---
+    /**
+     * Loads settings from the SettingsManager into the UI components.
+     */
     public void loadSettingsToUI() {
-        // Check if components are initialized
-        if (cpsSpinner == null || toggleHotkeyComboBox == null || pauseHotkeyComboBox == null) {
-            System.err.println("Warning: Attempting to load settings before UI components are initialized.");
-            // Optionally, schedule this call later if initialization is asynchronous
-            // SwingUtilities.invokeLater(this::loadSettingsToUI);
+        // Ensure we operate on the EDT
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(this::loadSettingsToUI);
             return;
         }
 
-        SwingUtilities.invokeLater(() -> {
+        // Check if components are initialized
+        if (cpsSpinner == null || clickModeComboBox == null) {
+            SwingUtilities.invokeLater(this::loadSettingsToUI);
+            return;
+        }
+
+        try {
             // Click Settings
             double currentCps = settingsManager.getCPS();
             cpsSpinner.setValue(currentCps);
+
+            // Style the spinner immediately after setting its value
+            styleSpinner(cpsSpinner);
+
             if (currentCps >= SLIDER_MIN_CPS && currentCps <= SLIDER_MAX_CPS) {
                 cpsSlider.setValue((int) Math.round(currentCps));
             } else {
                 cpsSlider.setValue(currentCps < SLIDER_MIN_CPS ? SLIDER_MIN_CPS : SLIDER_MAX_CPS);
             }
+
+            // Set combo box selections
             clickModeComboBox.setSelectedItem(settingsManager.getClickMode());
             mouseButtonComboBox.setSelectedItem(settingsManager.getMouseButton());
 
@@ -1007,54 +1210,121 @@ public class ControlPanel extends JPanel {
             randomizationFactorSlider.setEnabled(isRandomInterval);
             randomizationValueLabel.setText(String.format("%.0f%%", settingsManager.getRandomizationFactor() * 100));
             randomizationValueLabel.setEnabled(isRandomInterval);
-            // Update dependent label state
-            Component intensityLabel = findComponentByText(randomizationFactorSlider.getParent(), "Intensity:");
-            if(intensityLabel != null) intensityLabel.setEnabled(isRandomInterval);
 
+            // Find and update "Intensity:" label state
+            updateLabelState(randomizationFactorSlider.getParent(), "Intensity:", isRandomInterval);
+
+            // Random movement
             boolean isRandomMove = settingsManager.isRandomMovement();
             randomMovementCheckBox.setSelected(isRandomMove);
             movementRadiusSpinner.setValue(settingsManager.getMovementRadius());
             movementRadiusSpinner.setEnabled(isRandomMove);
-            // Update dependent label state
-            Component radiusLabel = findComponentByText(movementRadiusSpinner.getParent().getParent(), "Max Radius (pixels):"); // Check parent's parent
-            if(radiusLabel != null) radiusLabel.setEnabled(isRandomMove);
 
+            // Style the radius spinner
+            styleSpinner(movementRadiusSpinner);
 
-            // Hotkeys (Updated)
-            toggleHotkeyComboBox.setSelectedItem(settingsManager.getToggleHotkey());
-            visibilityHotkeyComboBox.setSelectedItem(settingsManager.getVisibilityHotkey());
-            pauseHotkeyComboBox.setSelectedItem(settingsManager.getPauseHotkey());
-            increaseSpeedHotkeyComboBox.setSelectedItem(settingsManager.getIncreaseSpeedHotkey());
-            decreaseSpeedHotkeyComboBox.setSelectedItem(settingsManager.getDecreaseSpeedHotkey());
+            // Find and update "Max Radius (pixels):" label state
+            Container parent = getParentContainer(movementRadiusSpinner);
+            if (parent != null) {
+                updateLabelState(parent, "Max Radius (pixels):", isRandomMove);
+            }
 
-            // Appearance
-            alwaysOnTopCheckBox.setSelected(settingsManager.isAlwaysOnTop());
-            autoHideCheckBox.setSelected(settingsManager.isAutoHide());
-            minimizeToTrayCheckBox.setSelected(settingsManager.isMinimizeToTray());
-            transparencySlider.setValue((int) (settingsManager.getTransparency() * 100));
-            transparencyValueLabel.setText(String.format("%.0f%%", settingsManager.getTransparency() * 100));
+            // Hotkeys - Apply on another invokeLater to ensure combo boxes are initialized
+            SwingUtilities.invokeLater(() -> {
+                if (parentFrame != null && parentFrame.getKeybindManager() != null) {
+                    // Set hotkey combo box selections
+                    safeSetComboBoxItem(toggleHotkeyComboBox, settingsManager.getToggleHotkey());
+                    safeSetComboBoxItem(visibilityHotkeyComboBox, settingsManager.getVisibilityHotkey());
+                    safeSetComboBoxItem(pauseHotkeyComboBox, settingsManager.getPauseHotkey());
+                    safeSetComboBoxItem(increaseSpeedHotkeyComboBox, settingsManager.getIncreaseSpeedHotkey());
+                    safeSetComboBoxItem(decreaseSpeedHotkeyComboBox, settingsManager.getDecreaseSpeedHotkey());
+                }
+            });
 
-            // Apply auto-hide setting
+            // Appearance settings
+            safeSetSelected(alwaysOnTopCheckBox, settingsManager.isAlwaysOnTop());
+            safeSetSelected(autoHideCheckBox, settingsManager.isAutoHide());
+            safeSetSelected(minimizeToTrayCheckBox, settingsManager.isMinimizeToTray());
+
+            if (transparencySlider != null) {
+                transparencySlider.setValue((int) (settingsManager.getTransparency() * 100));
+            }
+
+            if (transparencyValueLabel != null) {
+                transparencyValueLabel.setText(String.format("%.0f%%", settingsManager.getTransparency() * 100));
+            }
+
+            // Apply settings to the frame
             if (parentFrame != null) {
+                parentFrame.setAlwaysOnTop(settingsManager.isAlwaysOnTop());
                 parentFrame.setAutoHide(settingsManager.isAutoHide());
             }
 
-            // Apply theme colors after loading settings
-            applyThemeColors();
-        });
+        } catch (Exception e) {
+            System.err.println("Error loading settings into UI: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
-    // Helper to find components by text (more reliable than name)
-    private Component findComponentByText(Container container, String text) {
-        if (container == null || text == null) return null;
+    /**
+     * Gets the appropriate parent container for finding associated labels.
+     */
+    private Container getParentContainer(Component comp) {
+        Container parent = comp.getParent();
+        int searchDepth = 0;
+        final int MAX_DEPTH = 5; // Prevent infinite recursion
+
+        while (parent != null && searchDepth < MAX_DEPTH) {
+            if (parent instanceof JPanel && parent.getLayout() instanceof BorderLayout) {
+                return parent;
+            }
+            parent = parent.getParent();
+            searchDepth++;
+        }
+
+        return null;
+    }
+
+    /**
+     * Updates the enabled state of a label with specific text.
+     */
+    private void updateLabelState(Container container, String labelText, boolean enabled) {
+        if (container == null || labelText == null) return;
+
         for (Component comp : container.getComponents()) {
-            if (comp instanceof JLabel && text.equals(((JLabel) comp).getText())) {
-                return comp;
-            } else if (comp instanceof Container) {
-                Component found = findComponentByText((Container) comp, text);
-                if (found != null) return found;
+            if (comp instanceof JLabel && Objects.equals(labelText, ((JLabel) comp).getText())) {
+                comp.setEnabled(enabled);
+                return;
             }
         }
-        return null;
+    }
+
+    /**
+     * Safely sets a combo box selection, handling null values and validation.
+     */
+    private void safeSetComboBoxItem(JComboBox<String> comboBox, String item) {
+        if (comboBox != null && item != null) {
+            // Check if the item exists in the combo box
+            boolean validItem = false;
+            for (int i = 0; i < comboBox.getItemCount(); i++) {
+                if (item.equals(comboBox.getItemAt(i))) {
+                    validItem = true;
+                    break;
+                }
+            }
+
+            if (validItem) {
+                comboBox.setSelectedItem(item);
+            }
+        }
+    }
+
+    /**
+     * Safely sets a checkbox selection, handling null values.
+     */
+    private void safeSetSelected(JCheckBox checkBox, boolean selected) {
+        if (checkBox != null) {
+            checkBox.setSelected(selected);
+        }
     }
 }
