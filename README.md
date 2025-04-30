@@ -1,7 +1,9 @@
 # YakClicker
 
+[WORK IN PROGRESS] 
 
-YakClicker is a modern, feature-rich auto-clicker application with a sleek web-app style UI. It provides precise control over automated mouse clicks with advanced humanization features, pattern recording, and platform-specific optimizations.
+
+YakClicker is a modern, feature-rich auto-clicker application with a sleek UI. It provides precise control over automated mouse clicks with advanced humanization features, pattern recording, and platform-specific optimizations.
 
 ## Features
 
