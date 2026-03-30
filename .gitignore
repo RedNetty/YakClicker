@@ -3,3 +3,15 @@
 
 # IntelliJ IDEA
 .idea/
+
+# Maven archetype boilerplate
+src/main/resources/archetype-resources/
+src/main/resources/META-INF/
+
+# Build artifacts
+*.class
+*.jar
+!*-sources.jar
+*.log
+.DS_Store
+Thumbs.db
